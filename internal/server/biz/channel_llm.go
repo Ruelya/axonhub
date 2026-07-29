@@ -639,10 +639,12 @@ func (svc *ChannelService) buildChannelWithTransformer(c *ent.Channel, apiKeyOve
 
 		return ch, nil
 	case channel.TypeXaiResponses:
-		// OpenAI-compatible Responses toward xAI; orchestrator bridges Codex apply_patch when needed.
+		// OpenAI-compatible Responses toward xAI (HTTP/SSE or WebSocket via endpoint transport).
+		// Orchestrator bridges Codex freeform apply_patch when needed.
 		transformer, err := responses.NewOutboundTransformerWithConfig(&responses.Config{
 			BaseURL:        c.BaseURL,
 			APIKeyProvider: getAPIKeyProvider(ch),
+			Transport:      primaryEndpointTransport(c, llm.APIFormatOpenAIResponse.String()),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create outbound transformer: %w", err)

@@ -86,6 +86,8 @@ const OPENAI_RESPONSES_WEBSOCKET: ApiFormatOption = 'openai/responses:websocket'
 // defaults with ## unless the upstream URL should be used fully raw.
 const OPENAI_RESPONSES_WEBSOCKET_BASE_URL = 'wss://api.openai.com/v1#';
 const CODEX_RESPONSES_WEBSOCKET_BASE_URL = 'wss://chatgpt.com/backend-api/codex#';
+// xAI Responses WebSocket: wss://api.x.ai/v1/responses (see xAI websocket-mode docs).
+const XAI_RESPONSES_WEBSOCKET_BASE_URL = 'wss://api.x.ai/v1#';
 
 function getResponsesTransportFromBaseURL(baseURL?: string): ResponsesTransport {
   return baseURL?.trim().toLowerCase().startsWith('ws') ? 'websocket' : 'http';
@@ -175,7 +177,13 @@ function getResponsesTransportFromChannel(channel?: Pick<Channel, 'baseURL' | 'e
 function getResponsesWebSocketBaseURL(channelType: ChannelType): string | undefined {
   if (channelType === 'codex') return CODEX_RESPONSES_WEBSOCKET_BASE_URL;
   if (channelType === 'openai_responses') return OPENAI_RESPONSES_WEBSOCKET_BASE_URL;
+  if (channelType === 'xai_responses') return XAI_RESPONSES_WEBSOCKET_BASE_URL;
   return undefined;
+}
+
+/** Providers that expose Responses WebSocket as an API-format dropdown option. */
+function providerSupportsResponsesWebSocket(provider: string | undefined): boolean {
+  return provider === 'openai' || provider === 'xai';
 }
 
 function isOpenCodeGoChannelType(channelType: ChannelType | undefined): channelType is 'opencode_go' | 'opencode_go_anthropic' {
@@ -611,7 +619,7 @@ export function ChannelsActionDialog({ currentRow, duplicateFromRow, open, onOpe
   }, [selectedProvider]);
 
   const availableApiFormatOptions = useMemo<ApiFormatOption[]>(() => {
-    if (selectedProvider !== 'openai') return availableApiFormats;
+    if (!providerSupportsResponsesWebSocket(selectedProvider)) return availableApiFormats;
 
     const options: ApiFormatOption[] = [];
     for (const format of availableApiFormats) {
