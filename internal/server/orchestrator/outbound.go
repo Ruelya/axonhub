@@ -393,6 +393,10 @@ func (p *PersistentOutboundTransformer) TransformRequest(ctx context.Context, ll
 	// (and restore custom_tool_call on the response path).
 	llmRequest = applyCustomToolBridgeForOutbound(llmRequest, p)
 
+	// Flatten Responses namespace tools (agents / mcp__*) in message history so
+	// function names match the flattened tool list sent to non-Responses providers.
+	llmRequest = applyNamespaceFlattenForOutbound(llmRequest, p.wrapped.APIFormat())
+
 	// After bridging, any remaining custom tool history is still unsafe on
 	// non-Responses channels — keep the fail-closed filter for those.
 	llmRequest = filterResponseCustomToolMessagesForNonResponsesOutbound(llmRequest, p.wrapped.APIFormat())
@@ -453,6 +457,17 @@ func applyCustomToolBridgeForOutbound(llmRequest *llm.Request, p *PersistentOutb
 	}
 
 	return bridged
+}
+
+func applyNamespaceFlattenForOutbound(llmRequest *llm.Request, outboundFormat llm.APIFormat) *llm.Request {
+	if llmRequest == nil {
+		return nil
+	}
+	// Responses-family outbounds understand namespace + name separately (or pass-through).
+	if outboundFormat == llm.APIFormatOpenAIResponse || outboundFormat == llm.APIFormatOpenAIResponseCompact {
+		return llmRequest
+	}
+	return shared.FlattenNamespaceToolCallsInRequest(llmRequest)
 }
 
 func (p *PersistentOutboundTransformer) customToolBridgeDecision() shared.BridgeDecision {
@@ -521,7 +536,10 @@ func (p *PersistentOutboundTransformer) TransformResponse(ctx context.Context, r
 	if err != nil {
 		return nil, err
 	}
-	return shared.RestoreCustomToolCallsOnResponse(resp, p.customToolBridgeDecision()), nil
+	// Order: freeform custom restore first, then namespace name restore for Codex.
+	resp = shared.RestoreCustomToolCallsOnResponse(resp, p.customToolBridgeDecision())
+	resp = shared.RestoreNamespaceToolCallsOnResponse(resp)
+	return resp, nil
 }
 
 func (p *PersistentOutboundTransformer) TransformStream(ctx context.Context, req *httpclient.Request, stream streams.Stream[*httpclient.StreamEvent]) (streams.Stream[*llm.Response], error) {
@@ -544,10 +562,10 @@ func (p *PersistentOutboundTransformer) TransformStream(ctx context.Context, req
 
 	decision := p.customToolBridgeDecision()
 	if decision.Enabled {
-		return shared.NewRestoreCustomToolStream(llmStream, decision), nil
+		llmStream = shared.NewRestoreCustomToolStream(llmStream, decision)
 	}
-
-	return llmStream, nil
+	// Always restore flattened agents__/mcp__* names for Responses clients.
+	return shared.NewRestoreNamespaceToolStream(llmStream), nil
 }
 
 func (p *PersistentOutboundTransformer) AggregateStreamChunks(
