@@ -234,19 +234,37 @@ func bridgeTools(tools []llm.Tool, names map[string]struct{}) []llm.Tool {
 }
 
 func customToolToFunctionTool(custom *llm.ResponseCustomTool) llm.Tool {
+	// Keep original Codex freeform description, then add a short wire-format note.
+	// Models often invent "*** Begin Patch ***" (extra trailing stars) or "@" hunks;
+	// pin the exact first/last lines and +/- content markers.
+	const formatHint = `
+
+This tool is exposed as a standard function. Put the entire patch text in the string argument "input" (the function wrapper is JSON; the patch body itself is plain text, not nested JSON).
+
+Exact patch shape (first line must be exactly "*** Begin Patch" with no trailing stars):
+*** Begin Patch
+*** Add File: path/to/file
++new line
+*** Update File: path/to/file
+@@
+ context line
+-old line
++new line
+*** Delete File: path/to/file
+*** End Patch
+`
 	desc := custom.Description
 	if desc == "" {
-		desc = "Apply a freeform patch to edit files. Pass the full patch text (*** Begin Patch ... *** End Patch) as the input string. Do not wrap the patch in additional JSON beyond the function arguments object."
-	} else {
-		desc = desc + "\n\nIMPORTANT: This tool is exposed as a standard function tool. Put the entire freeform patch text in the \"input\" string argument (*** Begin Patch ... *** End Patch). Do not use a freeform/custom tool envelope."
+		desc = "Edit files with an apply_patch freeform patch body."
 	}
+	desc = desc + formatHint
 
 	params, _ := json.Marshal(map[string]any{
 		"type": "object",
 		"properties": map[string]any{
 			"input": map[string]any{
 				"type":        "string",
-				"description": "Full freeform patch body for apply_patch, including *** Begin Patch and *** End Patch markers.",
+				"description": "Plain-text patch. First line exactly \"*** Begin Patch\", last line exactly \"*** End Patch\". Content lines start with + - or space. Do not write \"*** Begin Patch ***\".",
 			},
 		},
 		"required":             []string{"input"},
