@@ -21,8 +21,13 @@ const ChannelTypeXaiResponses = "xai_responses"
 // DefaultBridgedCustomToolNames are Responses freeform tools that xAI does not
 // accept as type=custom. Only these names are converted; shell_command / MCP
 // function tools stay untouched.
+//
+// "exec" is Codex code_mode freeform JS orchestrator (grammar/lark). Without
+// bridging, xAI often returns function_call exec with arguments "{}", and MCP
+// nested under exec can never run.
 var DefaultBridgedCustomToolNames = map[string]struct{}{
 	"apply_patch": {},
+	"exec":        {},
 }
 
 // BridgeDecision describes whether / how custom tools should be bridged for an
@@ -234,10 +239,33 @@ func bridgeTools(tools []llm.Tool, names map[string]struct{}) []llm.Tool {
 }
 
 func customToolToFunctionTool(custom *llm.ResponseCustomTool) llm.Tool {
-	// Keep original Codex freeform description, then add a short wire-format note.
-	// Models often invent "*** Begin Patch ***" (extra trailing stars) or "@" hunks;
-	// pin the exact first/last lines and +/- content markers.
-	const formatHint = `
+	// Keep original Codex freeform description, then add a short wire-format note
+	// so models fill the bridged function "input" string correctly.
+	desc := custom.Description
+	inputDesc := "Freeform tool body as a plain string (not nested JSON objects beyond this wrapper)."
+	switch custom.Name {
+	case "exec":
+		if desc == "" {
+			desc = "Run JavaScript to orchestrate nested tool calls (Codex code_mode)."
+		}
+		desc += `
+
+This tool is exposed as a standard function for xAI compatibility. Put the entire JavaScript source in the string argument "input" (the function wrapper is JSON; the script itself is raw JS, not nested JSON, not markdown fences).
+
+Example:
+{"input":"const r = await tools.shell_command({command:\"Get-ChildItem\"}); text(JSON.stringify(r));"}
+
+Nested tools (shell_command, apply_patch, mcp__*, etc.) are only available inside this script via the global tools object. Do not emit empty arguments "{}".
+`
+		inputDesc = "Raw JavaScript source for the exec sandbox. Optional first-line pragma // @exec: {...}. Not a JSON object of tool args."
+	default:
+		// apply_patch and any future freeform tools
+		if desc == "" {
+			desc = "Edit files with an apply_patch freeform patch body."
+		}
+		// Models often invent "*** Begin Patch ***" (extra trailing stars) or "@" hunks;
+		// pin the exact first/last lines and +/- content markers.
+		desc += `
 
 This tool is exposed as a standard function. Put the entire patch text in the string argument "input" (the function wrapper is JSON; the patch body itself is plain text, not nested JSON).
 
@@ -253,18 +281,15 @@ Exact patch shape (first line must be exactly "*** Begin Patch" with no trailing
 *** Delete File: path/to/file
 *** End Patch
 `
-	desc := custom.Description
-	if desc == "" {
-		desc = "Edit files with an apply_patch freeform patch body."
+		inputDesc = "Plain-text patch. First line exactly \"*** Begin Patch\", last line exactly \"*** End Patch\". Content lines start with + - or space. Do not write \"*** Begin Patch ***\"."
 	}
-	desc = desc + formatHint
 
 	params, _ := json.Marshal(map[string]any{
 		"type": "object",
 		"properties": map[string]any{
 			"input": map[string]any{
 				"type":        "string",
-				"description": "Plain-text patch. First line exactly \"*** Begin Patch\", last line exactly \"*** End Patch\". Content lines start with + - or space. Do not write \"*** Begin Patch ***\".",
+				"description": inputDesc,
 			},
 		},
 		"required":             []string{"input"},
@@ -280,7 +305,6 @@ Exact patch shape (first line must be exactly "*** Begin Patch" with no trailing
 		},
 	}
 }
-
 func bridgeMessagesOutbound(messages []llm.Message, names map[string]struct{}) []llm.Message {
 	if len(messages) == 0 {
 		return messages
