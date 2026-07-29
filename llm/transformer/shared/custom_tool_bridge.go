@@ -38,17 +38,27 @@ type BridgeDecision struct {
 	Names map[string]struct{}
 }
 
-// ShouldBridgeCustomTools is true only when:
-//  1. the selected outbound channel type is xai_responses, and
-//  2. the inbound client request is OpenAI Responses (Codex / openai_responses).
+// ShouldBridgeCustomTools is true when:
+//  1. the inbound client request is OpenAI Responses (Codex), and
+//  2. the outbound channel does NOT natively accept Responses freeform
+//     type=custom tools (so they must be rewritten to function tools).
 //
-// Ordinary xai (chat completions) channels and OpenAI Responses→OpenAI Responses
-// routes are not bridged.
+// Enabled for xai_responses, anthropic, openai (chat), claudecode, etc.
+// Disabled for native openai_responses upstreams that already accept custom tools.
+//
+// Without this, Anthropic outbound drops freeform "exec"/"apply_patch" and the
+// model only sees leftover tools (often just Anthropic web_search).
 func ShouldBridgeCustomTools(channelType string, inboundFormat llm.APIFormat) bool {
-	if !strings.EqualFold(strings.TrimSpace(channelType), ChannelTypeXaiResponses) {
+	if inboundFormat != llm.APIFormatOpenAIResponse && inboundFormat != llm.APIFormatOpenAIResponseCompact {
 		return false
 	}
-	return inboundFormat == llm.APIFormatOpenAIResponse || inboundFormat == llm.APIFormatOpenAIResponseCompact
+	ct := strings.ToLower(strings.TrimSpace(channelType))
+	switch ct {
+	case "openai_responses", "openai-responses", "responses":
+		return false
+	default:
+		return ct != ""
+	}
 }
 
 // NewBridgeDecision builds a decision for the given outbound channel and inbound
