@@ -12,20 +12,26 @@ import (
 func TestShouldBridgeCustomTools(t *testing.T) {
 	t.Parallel()
 
-	// Codex Responses inbound + non-native-custom channels → bridge.
+	// Codex Responses inbound + freeform-broken channels → bridge.
 	require.True(t, ShouldBridgeCustomTools(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse))
 	require.True(t, ShouldBridgeCustomTools("xai_responses", llm.APIFormatOpenAIResponseCompact))
 	require.True(t, ShouldBridgeCustomTools("anthropic", llm.APIFormatOpenAIResponse))
 	require.True(t, ShouldBridgeCustomTools("xai", llm.APIFormatOpenAIResponse))
 	require.True(t, ShouldBridgeCustomTools("openai", llm.APIFormatOpenAIResponse))
 	require.True(t, ShouldBridgeCustomTools("claudecode", llm.APIFormatOpenAIResponse))
+	require.True(t, ShouldBridgeCustomTools("gemini", llm.APIFormatOpenAIResponse))
 
-	// Native OpenAI Responses channels keep custom tools as-is.
+	// Native Responses-family: no bridge (preserves pass-through for codex channels).
 	require.False(t, ShouldBridgeCustomTools("openai_responses", llm.APIFormatOpenAIResponse))
+	require.False(t, ShouldBridgeCustomTools("codex", llm.APIFormatOpenAIResponse))
+	require.False(t, ShouldBridgeCustomTools("codex", llm.APIFormatOpenAIResponseCompact))
+
 	// Chat Completions inbound is never bridged here.
 	require.False(t, ShouldBridgeCustomTools(ChannelTypeXaiResponses, llm.APIFormatOpenAIChatCompletion))
 	require.False(t, ShouldBridgeCustomTools("anthropic", llm.APIFormatOpenAIChatCompletion))
 	require.False(t, ShouldBridgeCustomTools("", llm.APIFormatOpenAIResponse))
+	// Unknown channel types: do not bridge by default.
+	require.False(t, ShouldBridgeCustomTools("some_future_type", llm.APIFormatOpenAIResponse))
 }
 
 func TestBridgeRequestForOutbound_ToolsAndHistory(t *testing.T) {

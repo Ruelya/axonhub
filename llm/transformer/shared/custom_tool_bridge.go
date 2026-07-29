@@ -40,24 +40,35 @@ type BridgeDecision struct {
 
 // ShouldBridgeCustomTools is true when:
 //  1. the inbound client request is OpenAI Responses (Codex), and
-//  2. the outbound channel does NOT natively accept Responses freeform
-//     type=custom tools (so they must be rewritten to function tools).
+//  2. the outbound channel is known to mishandle Responses freeform type=custom
+//     tools (so they must be rewritten to function tools).
 //
-// Enabled for xai_responses, anthropic, openai (chat), claudecode, etc.
-// Disabled for native openai_responses upstreams that already accept custom tools.
+// Bridge allowlist: xai_responses, anthropic, claudecode, openai/chat, gemini, …
+// Do NOT bridge native Responses-family channels (openai_responses, codex):
+// they accept custom freeform tools, and enabling the bridge forces
+// isPassThroughEnabled()=false (see orchestrator/pass_through.go), which
+// rewrites bodies and breaks Codex→codex pass-through.
 //
-// Without this, Anthropic outbound drops freeform "exec"/"apply_patch" and the
-// model only sees leftover tools (often just Anthropic web_search).
+// Unknown channel types default to false so same-format pass-through keeps
+// working; add them to the allowlist when freeform drops are observed.
 func ShouldBridgeCustomTools(channelType string, inboundFormat llm.APIFormat) bool {
 	if inboundFormat != llm.APIFormatOpenAIResponse && inboundFormat != llm.APIFormatOpenAIResponseCompact {
 		return false
 	}
 	ct := strings.ToLower(strings.TrimSpace(channelType))
 	switch ct {
-	case "openai_responses", "openai-responses", "responses":
+	// Native Responses-family: keep custom tools + allow body pass-through.
+	case "openai_responses", "openai-responses", "responses", "codex":
 		return false
+	// Known freeform breakage (custom dropped / empty args / schema mismatch).
+	case ChannelTypeXaiResponses,
+		"anthropic", "claudecode", "deepseek_anthropic",
+		"openai", "xai", "gemini", "openrouter",
+		"minimax", "cerebras", "deepseek", "moonshot",
+		"fireworks", "bailian", "zai", "doubao", "longcat":
+		return true
 	default:
-		return ct != ""
+		return false
 	}
 }
 
