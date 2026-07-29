@@ -86,6 +86,7 @@ export const channelTypeSchema = z.enum([
   'xiaomi',
   'xiaomi_anthropic',
   'xai',
+  'xai_responses',
   'ppio',
   'siliconflow',
   'volcengine',

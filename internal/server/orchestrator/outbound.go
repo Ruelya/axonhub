@@ -386,6 +386,15 @@ func (p *PersistentOutboundTransformer) TransformRequest(ctx context.Context, ll
 
 	// Apply channel transform options to create a new request
 	llmRequest = applyTransformOptions(llmRequest, candidate.Channel.Settings)
+
+	// Codex freeform apply_patch (Responses type=custom) is not accepted by
+	// xAI. When the outbound channel type is xai_responses and the inbound
+	// client is OpenAI Responses/Codex, bridge custom tools to function tools
+	// (and restore custom_tool_call on the response path).
+	llmRequest = applyCustomToolBridgeForOutbound(llmRequest, p)
+
+	// After bridging, any remaining custom tool history is still unsafe on
+	// non-Responses channels — keep the fail-closed filter for those.
 	llmRequest = filterResponseCustomToolMessagesForNonResponsesOutbound(llmRequest, p.wrapped.APIFormat())
 
 	if shouldForceStreamingForCandidate(candidate, llmRequest) {
@@ -405,6 +414,72 @@ func (p *PersistentOutboundTransformer) TransformRequest(ctx context.Context, ll
 	}
 
 	return p.wrapped.TransformRequest(ctx, llmRequest)
+}
+
+// applyCustomToolBridgeForOutbound converts Responses custom tools (e.g.
+// Codex apply_patch) into function tools when the outbound channel type is
+// xai_responses and the inbound client is OpenAI Responses/Codex.
+// The original request on p.state.LlmRequest is left with bridge metadata so
+// the response path can restore custom_tool_call shapes for the client.
+func applyCustomToolBridgeForOutbound(llmRequest *llm.Request, p *PersistentOutboundTransformer) *llm.Request {
+	if llmRequest == nil || p == nil {
+		return llmRequest
+	}
+
+	decision := p.customToolBridgeDecision()
+	if !decision.Enabled {
+		return llmRequest
+	}
+
+	bridged := shared.BridgeRequestForOutbound(llmRequest, decision)
+
+	// Persist bridge flags onto the shared original request metadata so
+	// TransformResponse / TransformStream can restore custom tool calls, and so
+	// pass-through is disabled for this turn.
+	if p.state != nil && p.state.LlmRequest != nil {
+		if p.state.LlmRequest.TransformerMetadata == nil {
+			p.state.LlmRequest.TransformerMetadata = map[string]any{}
+		}
+		p.state.LlmRequest.TransformerMetadata[shared.MetaCustomToolBridgeEnabled] = true
+		if names, ok := bridged.TransformerMetadata[shared.MetaCustomToolBridgeNames]; ok {
+			p.state.LlmRequest.TransformerMetadata[shared.MetaCustomToolBridgeNames] = names
+		} else {
+			namesList := make([]string, 0, len(decision.Names))
+			for n := range decision.Names {
+				namesList = append(namesList, n)
+			}
+			p.state.LlmRequest.TransformerMetadata[shared.MetaCustomToolBridgeNames] = namesList
+		}
+	}
+
+	return bridged
+}
+
+func (p *PersistentOutboundTransformer) customToolBridgeDecision() shared.BridgeDecision {
+	if p == nil || p.state == nil {
+		return shared.BridgeDecision{}
+	}
+	// Prefer flags written after a successful request-side bridge.
+	if p.state.LlmRequest != nil {
+		if d := shared.BridgeDecisionFromRequest(p.state.LlmRequest); d.Enabled {
+			return d
+		}
+	}
+
+	channelType := ""
+	if p.state.CurrentCandidate != nil && p.state.CurrentCandidate.Channel != nil {
+		channelType = p.state.CurrentCandidate.Channel.Type.String()
+	}
+
+	// Inbound client API format (Codex / openai_responses), not the outbound
+	// provider format — bridging is only for Responses clients talking to
+	// xai_responses channels.
+	inboundFormat := llm.APIFormat("")
+	if p.state.LlmRequest != nil {
+		inboundFormat = p.state.LlmRequest.APIFormat
+	}
+
+	return shared.NewBridgeDecision(channelType, inboundFormat)
 }
 
 func filterResponseCustomToolMessagesForNonResponsesOutbound(
@@ -442,7 +517,11 @@ func containsResponseCustomToolMessages(messages []llm.Message) bool {
 }
 
 func (p *PersistentOutboundTransformer) TransformResponse(ctx context.Context, response *httpclient.Response) (*llm.Response, error) {
-	return p.wrapped.TransformResponse(ctx, response)
+	resp, err := p.wrapped.TransformResponse(ctx, response)
+	if err != nil {
+		return nil, err
+	}
+	return shared.RestoreCustomToolCallsOnResponse(resp, p.customToolBridgeDecision()), nil
 }
 
 func (p *PersistentOutboundTransformer) TransformStream(ctx context.Context, req *httpclient.Request, stream streams.Stream[*httpclient.StreamEvent]) (streams.Stream[*llm.Response], error) {
@@ -458,7 +537,17 @@ func (p *PersistentOutboundTransformer) TransformStream(ctx context.Context, req
 		p.state,
 	)
 
-	return p.wrapped.TransformStream(ctx, req, persistentStream)
+	llmStream, err := p.wrapped.TransformStream(ctx, req, persistentStream)
+	if err != nil {
+		return nil, err
+	}
+
+	decision := p.customToolBridgeDecision()
+	if decision.Enabled {
+		return shared.NewRestoreCustomToolStream(llmStream, decision), nil
+	}
+
+	return llmStream, nil
 }
 
 func (p *PersistentOutboundTransformer) AggregateStreamChunks(

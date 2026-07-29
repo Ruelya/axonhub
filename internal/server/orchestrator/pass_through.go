@@ -28,6 +28,12 @@ func (p *PersistentOutboundTransformer) isPassThroughEnabled(ctx context.Context
 		return false
 	}
 
+	// Codex freeform→function bridging for xai_responses rewrites the request body.
+	// Pass-through would replace that body with the original client payload and undo the bridge.
+	if p.customToolBridgeDecision().Enabled {
+		return false
+	}
+
 	rawReq := p.state.RawProviderRequest
 	if rawReq == nil || rawReq.APIFormat == "" {
 		return false
