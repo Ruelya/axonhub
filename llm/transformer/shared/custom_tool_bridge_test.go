@@ -234,6 +234,65 @@ func TestRestoreCustomToolStream_ProgressiveInput(t *testing.T) {
 	require.False(t, stream.Next())
 }
 
+// Regression: xAI/OpenAI streams often send name only on the first delta, then
+// bare argument fragments with empty name/id. Old keying used idx+name so those
+// fragments never joined and Codex saw custom_tool_call input="".
+func TestRestoreCustomToolStream_NameOnlyThenArgsOnly(t *testing.T) {
+	t.Parallel()
+
+	decision := NewBridgeDecision(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse)
+	patch := "*** Begin Patch\n*** Update File: a.txt\n@@\n-old\n+new\n*** End Patch\n"
+	args, err := json.Marshal(map[string]string{"input": patch})
+	require.NoError(t, err)
+
+	chunks := []*llm.Response{
+		{
+			Choices: []llm.Choice{{
+				Delta: &llm.Message{
+					ToolCalls: []llm.ToolCall{{
+						ID:    "fc_1",
+						Index: 0,
+						Type:  llm.ToolTypeFunction,
+						Function: llm.FunctionCall{
+							Name:      "apply_patch",
+							Arguments: "",
+						},
+					}},
+				},
+			}},
+		},
+		{
+			Choices: []llm.Choice{{
+				Delta: &llm.Message{
+					ToolCalls: []llm.ToolCall{{
+						// No id, no name — only index + arguments (real provider shape).
+						Index: 0,
+						Type:  llm.ToolTypeFunction,
+						Function: llm.FunctionCall{
+							Arguments: string(args),
+						},
+					}},
+				},
+			}},
+		},
+	}
+
+	stream := NewRestoreCustomToolStream(&sliceResponseStream{items: chunks}, decision)
+	require.True(t, stream.Next())
+	first := stream.Current().Choices[0].Delta.ToolCalls[0]
+	require.Equal(t, llm.ToolTypeResponsesCustomTool, first.Type)
+	require.Equal(t, "apply_patch", first.ResponseCustomToolCall.Name)
+	require.Equal(t, "fc_1", first.ResponseCustomToolCall.CallID)
+
+	require.True(t, stream.Next())
+	second := stream.Current().Choices[0].Delta.ToolCalls[0]
+	require.Equal(t, llm.ToolTypeResponsesCustomTool, second.Type)
+	require.Equal(t, "apply_patch", second.ResponseCustomToolCall.Name)
+	require.Equal(t, "fc_1", second.ResponseCustomToolCall.CallID)
+	require.Equal(t, patch, second.ResponseCustomToolCall.Input)
+	require.False(t, stream.Next())
+}
+
 func TestBridgeDecisionFromRequest(t *testing.T) {
 	t.Parallel()
 

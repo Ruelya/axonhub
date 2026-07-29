@@ -433,7 +433,11 @@ type restoreCustomToolStream struct {
 	accumArgs map[string]string
 	// emittedInput is call-key → freeform input already sent to the client.
 	emittedInput map[string]string
-	current      *llm.Response
+	// callNames / callIDs remember identity across argument-only deltas
+	// (providers often omit name/id after the first tool_call chunk).
+	callNames map[string]string
+	callIDs   map[string]string
+	current   *llm.Response
 }
 
 // NewRestoreCustomToolStream returns a stream that maps function apply_patch
@@ -444,6 +448,8 @@ func NewRestoreCustomToolStream(inner responseStream, decision BridgeDecision) *
 		decision:     decision,
 		accumArgs:    map[string]string{},
 		emittedInput: map[string]string{},
+		callNames:    map[string]string{},
+		callIDs:      map[string]string{},
 	}
 }
 
@@ -494,16 +500,20 @@ func (s *restoreCustomToolStream) restoreStreamChunk(resp *llm.Response) *llm.Re
 func (s *restoreCustomToolStream) restoreStreamToolCalls(calls []llm.ToolCall) []llm.ToolCall {
 	out := make([]llm.ToolCall, 0, len(calls))
 	for _, tc := range calls {
-		if !shouldRestoreToolCall(tc, s.decision.Names) {
+		key, name, ok := s.streamRestoreIdentity(tc)
+		if !ok {
 			out = append(out, tc)
 			continue
 		}
-		key := streamCallKey(tc)
 		s.accumArgs[key] += tc.Function.Arguments
 
 		// Prefer progressive extraction of the "input" field; fall back to empty
 		// until JSON is complete enough to parse.
 		fullInput := progressiveExtractInput(s.accumArgs[key])
+		// If progressive parse still empty but we have a complete args blob, use it.
+		if fullInput == "" {
+			fullInput = ExtractBridgedInput(s.accumArgs[key])
+		}
 		prev := s.emittedInput[key]
 		deltaInput := ""
 		if strings.HasPrefix(fullInput, prev) {
@@ -515,8 +525,11 @@ func (s *restoreCustomToolStream) restoreStreamToolCalls(calls []llm.ToolCall) [
 			s.emittedInput[key] = fullInput
 		}
 
-		callID := tc.ID
-		name := tc.Function.Name
+		callID := s.callIDs[key]
+		fn := tc.Function
+		if fn.Name == "" {
+			fn.Name = name
+		}
 		out = append(out, llm.ToolCall{
 			ID:    callID,
 			Type:  llm.ToolTypeResponsesCustomTool,
@@ -526,7 +539,7 @@ func (s *restoreCustomToolStream) restoreStreamToolCalls(calls []llm.ToolCall) [
 				Name:   name,
 				Input:  deltaInput,
 			},
-			Function:            tc.Function,
+			Function:            fn,
 			CacheControl:        tc.CacheControl,
 			TransformerMetadata: tc.TransformerMetadata,
 		})
@@ -534,11 +547,37 @@ func (s *restoreCustomToolStream) restoreStreamToolCalls(calls []llm.ToolCall) [
 	return out
 }
 
-func streamCallKey(tc llm.ToolCall) string {
-	if tc.ID != "" {
-		return tc.ID
+// streamRestoreIdentity resolves a stable stream key and tool name for a delta.
+// Providers commonly send name/id only on the first tool_call chunk, then bare
+// argument fragments. Keys are index-based so those fragments stay associated.
+func (s *restoreCustomToolStream) streamRestoreIdentity(tc llm.ToolCall) (key, name string, ok bool) {
+	if tc.ResponseCustomToolCall != nil {
+		// Already custom — leave to non-restore path (pass through).
+		return "", "", false
 	}
-	return "idx:" + strconv.Itoa(tc.Index) + ":" + tc.Function.Name
+	key = streamCallKey(tc)
+	name = strings.TrimSpace(tc.Function.Name)
+	if name == "" {
+		name = s.callNames[key]
+	}
+	if name == "" {
+		return key, "", false
+	}
+	if _, allowed := s.decision.Names[name]; !allowed {
+		return key, name, false
+	}
+	s.callNames[key] = name
+	if tc.ID != "" {
+		s.callIDs[key] = tc.ID
+	}
+	return key, name, true
+}
+
+// streamCallKey is stable across name-/id-less argument deltas. OpenAI-style
+// streams key tool fragments by index; id/name often appear only on the first
+// chunk. Never include name in the key (that split empty-input restores).
+func streamCallKey(tc llm.ToolCall) string {
+	return "idx:" + strconv.Itoa(tc.Index)
 }
 
 // progressiveExtractInput tries to read the freeform input from a possibly
