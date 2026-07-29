@@ -1,0 +1,1379 @@
+From e8e69221857037d74dd4f261b041af4af0a667cb Mon Sep 17 00:00:00 2001
+From: Ruelya <ujico@outlook.com>
+Date: Wed, 29 Jul 2026 10:05:06 +0800
+Subject: [patch] feat(channels): add xai_responses with Codex apply_patch
+ bridge
+
+Add channel type xai_responses (OpenAI Responses toward xAI). When the
+inbound client is OpenAI Responses/Codex and the outbound channel is
+xai_responses, bridge freeform custom apply_patch to function tools and
+restore custom_tool_call on the response path. Disable body pass-through
+while bridging so the conversion is not undone.
+
+Plain xai (chat completions) and openai_responses routes are unchanged.
+---
+ .github/workflows/docker-codex-bridge.yml     | 100 +++
+ .../features/channels/data/config_channels.ts |  10 +
+ .../channels/data/config_providers.ts         |   2 +-
+ frontend/src/features/channels/data/schema.ts |   1 +
+ frontend/src/locales/en/channels.json         |   1 +
+ frontend/src/locales/zh-CN/channels.json      |   1 +
+ internal/ent/channel/channel.go               |   7 +-
+ internal/ent/schema/channel.go                |   1 +
+ internal/server/biz/channel_endpoint.go       |   3 +-
+ internal/server/biz/channel_llm.go            |  13 +
+ internal/server/gql/ent.graphql               |   1 +
+ internal/server/orchestrator/outbound.go      |  93 ++-
+ internal/server/orchestrator/pass_through.go  |   6 +
+ llm/transformer/shared/custom_tool_bridge.go  | 638 ++++++++++++++++++
+ .../shared/custom_tool_bridge_test.go         | 273 ++++++++
+ 15 files changed, 1144 insertions(+), 6 deletions(-)
+ create mode 100644 .github/workflows/docker-codex-bridge.yml
+ create mode 100644 llm/transformer/shared/custom_tool_bridge.go
+ create mode 100644 llm/transformer/shared/custom_tool_bridge_test.go
+
+diff --git a/.github/workflows/docker-codex-bridge.yml b/.github/workflows/docker-codex-bridge.yml
+new file mode 100644
+index 00000000..6d75714b
+--- /dev/null
++++ b/.github/workflows/docker-codex-bridge.yml
+@@ -0,0 +1,100 @@
++# Publish self-use multi-arch images for the Codex↔xAI apply_patch bridge branch.
++# Images: ghcr.io/<owner>/axonhub:codex-bridge  (and :sha / :tag)
++name: Docker codex-bridge
++
++on:
++  push:
++    branches:
++      - feat/codex-grok-apply-patch-bridge
++    tags:
++      - 'v*-codex-bridge*'
++  workflow_dispatch:
++
++permissions:
++  contents: read
++  packages: write
++
++env:
++  REGISTRY: ghcr.io
++  IMAGE_NAME: ${{ github.repository }}
++
++jobs:
++  build:
++    name: Build & push (${{ matrix.arch }})
++    strategy:
++      fail-fast: false
++      matrix:
++        include:
++          - arch: amd64
++            platform: linux/amd64
++            runner: ubuntu-latest
++          - arch: arm64
++            platform: linux/arm64
++            runner: ubuntu-24.04-arm
++    runs-on: ${{ matrix.runner }}
++    steps:
++      - uses: actions/checkout@v4
++        with:
++          fetch-depth: 1
++
++      - name: Keep upstream VERSION (semver)
++        run: |
++          # Do not invent a non-semver build id; UI/migration expect valid versions.
++          test -f internal/build/VERSION
++          echo "VERSION=$(cat internal/build/VERSION)" >> "$GITHUB_ENV"
++          echo "Using VERSION=$(cat internal/build/VERSION)"
++
++      - uses: docker/setup-buildx-action@v3
++
++      - uses: docker/login-action@v3
++        with:
++          registry: ${{ env.REGISTRY }}
++          username: ${{ github.actor }}
++          password: ${{ secrets.GITHUB_TOKEN }}
++
++      - name: Build & push arch image
++        uses: docker/build-push-action@v6
++        with:
++          context: .
++          platforms: ${{ matrix.platform }}
++          push: true
++          tags: |
++            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:codex-bridge-${{ matrix.arch }}
++            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-${{ matrix.arch }}
++          cache-from: type=gha,scope=codex-bridge-${{ matrix.arch }}
++          cache-to: type=gha,mode=max,scope=codex-bridge-${{ matrix.arch }}
++          provenance: false
++          sbom: false
++
++  manifest:
++    name: Multi-arch manifest
++    needs: [build]
++    runs-on: ubuntu-latest
++    steps:
++      - uses: docker/login-action@v3
++        with:
++          registry: ${{ env.REGISTRY }}
++          username: ${{ github.actor }}
++          password: ${{ secrets.GITHUB_TOKEN }}
++
++      - name: Create manifest tags
++        env:
++          IMG: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
++        run: |
++          set -euo pipefail
++          # codex-bridge
++          docker buildx imagetools create -t "${IMG}:codex-bridge" \
++            "${IMG}:codex-bridge-amd64" \
++            "${IMG}:codex-bridge-arm64"
++          # commit sha
++          docker buildx imagetools create -t "${IMG}:sha-${GITHUB_SHA}" \
++            "${IMG}:sha-${GITHUB_SHA}-amd64" \
++            "${IMG}:sha-${GITHUB_SHA}-arm64"
++          # optional git tag
++          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
++            TAG="${GITHUB_REF#refs/tags/}"
++            docker buildx imagetools create -t "${IMG}:${TAG}" \
++              "${IMG}:codex-bridge-amd64" \
++              "${IMG}:codex-bridge-arm64"
++          fi
++          docker buildx imagetools inspect "${IMG}:codex-bridge"
+diff --git a/frontend/src/features/channels/data/config_channels.ts b/frontend/src/features/channels/data/config_channels.ts
+index 31e5f763..6a1b52f6 100644
+--- a/frontend/src/features/channels/data/config_channels.ts
++++ b/frontend/src/features/channels/data/config_channels.ts
+@@ -328,6 +328,14 @@ export const CHANNEL_CONFIGS: Record<ChannelType, ChannelConfig> = {
+     color: 'bg-black-100 text-black-800 border-black-200',
+     icon: XAI,
+   },
++  xai_responses: {
++    channelType: 'xai_responses',
++    baseURL: 'https://api.x.ai/v1',
++    defaultModels: ['grok-4.5', 'grok-4', 'grok-3', 'grok-3-mini', 'grok-code-fast', 'grok-4-fast-reasoning', 'grok-4-fast-non-reasoning'],
++    apiFormat: OPENAI_RESPONSES,
++    color: 'bg-black-100 text-black-800 border-black-200',
++    icon: XAI,
++  },
+   longcat: {
+     channelType: 'longcat',
+     baseURL: 'https://api.longcat.chat/openai/v1',
+@@ -781,6 +789,7 @@ export type Provider =
+   | 'longcat'
+   | 'xiaomi'
+   | 'xai'
++  | 'xai_responses'
+   | 'openrouter'
+   | 'vercel'
+   | 'ppio'
+@@ -837,6 +846,7 @@ export const CHANNEL_TYPE_TO_PROVIDER: Record<ChannelType, Provider> = {
+   xiaomi: 'xiaomi',
+   xiaomi_anthropic: 'xiaomi',
+   xai: 'xai',
++  xai_responses: 'xai',
+   openrouter: 'openrouter',
+   vercel: 'vercel',
+   ppio: 'ppio',
+diff --git a/frontend/src/features/channels/data/config_providers.ts b/frontend/src/features/channels/data/config_providers.ts
+index 78e9fd9b..602a0609 100644
+--- a/frontend/src/features/channels/data/config_providers.ts
++++ b/frontend/src/features/channels/data/config_providers.ts
+@@ -145,7 +145,7 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
+     provider: 'xai',
+     icon: XAI,
+     color: 'bg-black-100 text-black-800 border-black-200',
+-    channelTypes: ['xai'],
++    channelTypes: ['xai', 'xai_responses'],
+   },
+   burncloud: {
+     provider: 'burncloud',
+diff --git a/frontend/src/features/channels/data/schema.ts b/frontend/src/features/channels/data/schema.ts
+index b47b2923..23227bb2 100644
+--- a/frontend/src/features/channels/data/schema.ts
++++ b/frontend/src/features/channels/data/schema.ts
+@@ -86,6 +86,7 @@ export const channelTypeSchema = z.enum([
+   'xiaomi',
+   'xiaomi_anthropic',
+   'xai',
++  'xai_responses',
+   'ppio',
+   'siliconflow',
+   'volcengine',
+diff --git a/frontend/src/locales/en/channels.json b/frontend/src/locales/en/channels.json
+index 8677a1b0..2002353a 100644
+--- a/frontend/src/locales/en/channels.json
++++ b/frontend/src/locales/en/channels.json
+@@ -67,6 +67,7 @@
+   "channels.types.zai_anthropic": "Zai (Anthropic)",
+   "channels.types.vercel": "Vercel",
+   "channels.types.xai": "xAI",
++  "channels.types.xai_responses": "xAI (Responses)",
+   "channels.types.ppio": "PPIO",
+   "channels.types.siliconflow": "SiliconFlow",
+   "channels.types.volcengine": "Volcengine",
+diff --git a/frontend/src/locales/zh-CN/channels.json b/frontend/src/locales/zh-CN/channels.json
+index 5e5ff533..8b267822 100644
+--- a/frontend/src/locales/zh-CN/channels.json
++++ b/frontend/src/locales/zh-CN/channels.json
+@@ -67,6 +67,7 @@
+   "channels.types.zai_anthropic": "Zai (Anthropic)",
+   "channels.types.vercel": "Vercel",
+   "channels.types.xai": "xAI",
++  "channels.types.xai_responses": "xAI (Responses)",
+   "channels.types.ppio": "欧派云",
+   "channels.types.siliconflow": "硅基流动",
+   "channels.types.volcengine": "火山引擎",
+diff --git a/internal/ent/channel/channel.go b/internal/ent/channel/channel.go
+index b660eaa4..91699e04 100644
+--- a/internal/ent/channel/channel.go
++++ b/internal/ent/channel/channel.go
+@@ -228,7 +228,10 @@ const (
+ 	TypeXiaomi              Type = "xiaomi"
+ 	TypeXiaomiAnthropic     Type = "xiaomi_anthropic"
+ 	TypeXai                 Type = "xai"
+-	TypePpio                Type = "ppio"
++	// TypeXaiResponses is xAI's OpenAI-compatible Responses endpoint, with
++	// Codex freeform→function tool bridging for apply_patch.
++	TypeXaiResponses Type = "xai_responses"
++	TypePpio         Type = "ppio"
+ 	TypeSiliconflow         Type = "siliconflow"
+ 	TypeVolcengine          Type = "volcengine"
+ 	TypeVolcengineAnthropic Type = "volcengine_anthropic"
+@@ -266,7 +269,7 @@ func (_type Type) String() string {
+ // TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
+ func TypeValidator(_type Type) error {
+ 	switch _type {
+-	case TypeOpenai, TypeOpenaiResponses, TypeAtlascloud, TypeCline, TypeCodex, TypeVercel, TypeAnthropic, TypeAnthropicAWS, TypeAnthropicGcp, TypeGeminiOpenai, TypeGemini, TypeGeminiVertex, TypeDeepseek, TypeDeepseekAnthropic, TypeDeepinfra, TypeQiniu, TypeFireworks, TypeDoubao, TypeDoubaoAnthropic, TypeMoonshot, TypeMoonshotAnthropic, TypeZhipu, TypeZai, TypeZhipuAnthropic, TypeZaiAnthropic, TypeAnthropicFake, TypeOpenaiFake, TypeOpenrouter, TypeXiaomi, TypeXiaomiAnthropic, TypeXai, TypePpio, TypeSiliconflow, TypeVolcengine, TypeVolcengineAnthropic, TypeLongcat, TypeLongcatAnthropic, TypeMinimax, TypeMinimaxAnthropic, TypeAihubmix, TypeAihubmixAnthropic, TypeBurncloud, TypeModelscope, TypeBailian, TypeBailianAnthropic, TypeMoonshotCoding, TypeJina, TypeGithub, TypeGithubCopilot, TypeClaudecode, TypeCerebras, TypeAntigravity, TypeNanogpt, TypeNanogptResponses, TypeOpencodeGo, TypeOpencodeGoAnthropic, TypeOllama, TypeOllamaAnthropic, TypeEvolink, TypeEvolinkAnthropic:
++	case TypeOpenai, TypeOpenaiResponses, TypeAtlascloud, TypeCline, TypeCodex, TypeVercel, TypeAnthropic, TypeAnthropicAWS, TypeAnthropicGcp, TypeGeminiOpenai, TypeGemini, TypeGeminiVertex, TypeDeepseek, TypeDeepseekAnthropic, TypeDeepinfra, TypeQiniu, TypeFireworks, TypeDoubao, TypeDoubaoAnthropic, TypeMoonshot, TypeMoonshotAnthropic, TypeZhipu, TypeZai, TypeZhipuAnthropic, TypeZaiAnthropic, TypeAnthropicFake, TypeOpenaiFake, TypeOpenrouter, TypeXiaomi, TypeXiaomiAnthropic, TypeXai, TypeXaiResponses, TypePpio, TypeSiliconflow, TypeVolcengine, TypeVolcengineAnthropic, TypeLongcat, TypeLongcatAnthropic, TypeMinimax, TypeMinimaxAnthropic, TypeAihubmix, TypeAihubmixAnthropic, TypeBurncloud, TypeModelscope, TypeBailian, TypeBailianAnthropic, TypeMoonshotCoding, TypeJina, TypeGithub, TypeGithubCopilot, TypeClaudecode, TypeCerebras, TypeAntigravity, TypeNanogpt, TypeNanogptResponses, TypeOpencodeGo, TypeOpencodeGoAnthropic, TypeOllama, TypeOllamaAnthropic, TypeEvolink, TypeEvolinkAnthropic:
+ 		return nil
+ 	default:
+ 		return fmt.Errorf("channel: invalid enum value for type field: %q", _type)
+diff --git a/internal/ent/schema/channel.go b/internal/ent/schema/channel.go
+index 289c1af1..c87a7c2f 100644
+--- a/internal/ent/schema/channel.go
++++ b/internal/ent/schema/channel.go
+@@ -67,6 +67,7 @@ func (Channel) Fields() []ent.Field {
+ 				"xiaomi",
+ 				"xiaomi_anthropic",
+ 				"xai",
++				"xai_responses",
+ 				"ppio",
+ 				"siliconflow",
+ 				"volcengine",
+diff --git a/internal/server/biz/channel_endpoint.go b/internal/server/biz/channel_endpoint.go
+index a123f977..e4683ee1 100644
+--- a/internal/server/biz/channel_endpoint.go
++++ b/internal/server/biz/channel_endpoint.go
+@@ -163,7 +163,8 @@ var defaultEndpointsForChannelType = map[channel.Type][]objects.ChannelEndpoint{
+ 	},
+ 	channel.TypeXiaomi:              openAIChatOnlyDefaultEndpoints,
+ 	channel.TypeXiaomiAnthropic:     {{APIFormat: llm.APIFormatAnthropicMessage.String()}},
+-	channel.TypeXai:                 {{APIFormat: llm.APIFormatOpenAIChatCompletion.String()}},
++	channel.TypeXai:          {{APIFormat: llm.APIFormatOpenAIChatCompletion.String()}},
++	channel.TypeXaiResponses: {{APIFormat: llm.APIFormatOpenAIResponse.String()}},
+ 	channel.TypePpio:                openAICompatibleDefaultEndpoints,
+ 	channel.TypeSiliconflow:         openAICompatibleDefaultEndpoints,
+ 	channel.TypeVolcengine:          {{APIFormat: llm.APIFormatOpenAIChatCompletion.String()}},
+diff --git a/internal/server/biz/channel_llm.go b/internal/server/biz/channel_llm.go
+index 1b1cf74a..ac014385 100644
+--- a/internal/server/biz/channel_llm.go
++++ b/internal/server/biz/channel_llm.go
+@@ -637,6 +637,19 @@ func (svc *ChannelService) buildChannelWithTransformer(c *ent.Channel, apiKeyOve
+ 
+ 		ch.Outbound = transformer
+ 
++		return ch, nil
++	case channel.TypeXaiResponses:
++		// OpenAI-compatible Responses toward xAI; orchestrator bridges Codex apply_patch when needed.
++		transformer, err := responses.NewOutboundTransformerWithConfig(&responses.Config{
++			BaseURL:        c.BaseURL,
++			APIKeyProvider: getAPIKeyProvider(ch),
++		})
++		if err != nil {
++			return nil, fmt.Errorf("failed to create outbound transformer: %w", err)
++		}
++
++		ch.Outbound = transformer
++
+ 		return ch, nil
+ 	case channel.TypeLongcatAnthropic:
+ 		transformer, err := anthropic.NewOutboundTransformerWithConfig(&anthropic.Config{
+diff --git a/internal/server/gql/ent.graphql b/internal/server/gql/ent.graphql
+index f8534c83..31a8599c 100644
+--- a/internal/server/gql/ent.graphql
++++ b/internal/server/gql/ent.graphql
+@@ -1290,6 +1290,7 @@ enum ChannelType @goModel(model: "github.com/looplj/axonhub/internal/ent/channel
+   xiaomi
+   xiaomi_anthropic
+   xai
++  xai_responses
+   ppio
+   siliconflow
+   volcengine
+diff --git a/internal/server/orchestrator/outbound.go b/internal/server/orchestrator/outbound.go
+index 20af8f4f..c9c0e19b 100644
+--- a/internal/server/orchestrator/outbound.go
++++ b/internal/server/orchestrator/outbound.go
+@@ -386,6 +386,15 @@ func (p *PersistentOutboundTransformer) TransformRequest(ctx context.Context, ll
+ 
+ 	// Apply channel transform options to create a new request
+ 	llmRequest = applyTransformOptions(llmRequest, candidate.Channel.Settings)
++
++	// Codex freeform apply_patch (Responses type=custom) is not accepted by
++	// xAI. When the outbound channel type is xai_responses and the inbound
++	// client is OpenAI Responses/Codex, bridge custom tools to function tools
++	// (and restore custom_tool_call on the response path).
++	llmRequest = applyCustomToolBridgeForOutbound(llmRequest, p)
++
++	// After bridging, any remaining custom tool history is still unsafe on
++	// non-Responses channels — keep the fail-closed filter for those.
+ 	llmRequest = filterResponseCustomToolMessagesForNonResponsesOutbound(llmRequest, p.wrapped.APIFormat())
+ 
+ 	if shouldForceStreamingForCandidate(candidate, llmRequest) {
+@@ -407,6 +416,72 @@ func (p *PersistentOutboundTransformer) TransformRequest(ctx context.Context, ll
+ 	return p.wrapped.TransformRequest(ctx, llmRequest)
+ }
+ 
++// applyCustomToolBridgeForOutbound converts Responses custom tools (e.g.
++// Codex apply_patch) into function tools when the outbound channel type is
++// xai_responses and the inbound client is OpenAI Responses/Codex.
++// The original request on p.state.LlmRequest is left with bridge metadata so
++// the response path can restore custom_tool_call shapes for the client.
++func applyCustomToolBridgeForOutbound(llmRequest *llm.Request, p *PersistentOutboundTransformer) *llm.Request {
++	if llmRequest == nil || p == nil {
++		return llmRequest
++	}
++
++	decision := p.customToolBridgeDecision()
++	if !decision.Enabled {
++		return llmRequest
++	}
++
++	bridged := shared.BridgeRequestForOutbound(llmRequest, decision)
++
++	// Persist bridge flags onto the shared original request metadata so
++	// TransformResponse / TransformStream can restore custom tool calls, and so
++	// pass-through is disabled for this turn.
++	if p.state != nil && p.state.LlmRequest != nil {
++		if p.state.LlmRequest.TransformerMetadata == nil {
++			p.state.LlmRequest.TransformerMetadata = map[string]any{}
++		}
++		p.state.LlmRequest.TransformerMetadata[shared.MetaCustomToolBridgeEnabled] = true
++		if names, ok := bridged.TransformerMetadata[shared.MetaCustomToolBridgeNames]; ok {
++			p.state.LlmRequest.TransformerMetadata[shared.MetaCustomToolBridgeNames] = names
++		} else {
++			namesList := make([]string, 0, len(decision.Names))
++			for n := range decision.Names {
++				namesList = append(namesList, n)
++			}
++			p.state.LlmRequest.TransformerMetadata[shared.MetaCustomToolBridgeNames] = namesList
++		}
++	}
++
++	return bridged
++}
++
++func (p *PersistentOutboundTransformer) customToolBridgeDecision() shared.BridgeDecision {
++	if p == nil || p.state == nil {
++		return shared.BridgeDecision{}
++	}
++	// Prefer flags written after a successful request-side bridge.
++	if p.state.LlmRequest != nil {
++		if d := shared.BridgeDecisionFromRequest(p.state.LlmRequest); d.Enabled {
++			return d
++		}
++	}
++
++	channelType := ""
++	if p.state.CurrentCandidate != nil && p.state.CurrentCandidate.Channel != nil {
++		channelType = p.state.CurrentCandidate.Channel.Type.String()
++	}
++
++	// Inbound client API format (Codex / openai_responses), not the outbound
++	// provider format — bridging is only for Responses clients talking to
++	// xai_responses channels.
++	inboundFormat := llm.APIFormat("")
++	if p.state.LlmRequest != nil {
++		inboundFormat = p.state.LlmRequest.APIFormat
++	}
++
++	return shared.NewBridgeDecision(channelType, inboundFormat)
++}
++
+ func filterResponseCustomToolMessagesForNonResponsesOutbound(
+ 	llmRequest *llm.Request,
+ 	outboundFormat llm.APIFormat,
+@@ -442,7 +517,11 @@ func containsResponseCustomToolMessages(messages []llm.Message) bool {
+ }
+ 
+ func (p *PersistentOutboundTransformer) TransformResponse(ctx context.Context, response *httpclient.Response) (*llm.Response, error) {
+-	return p.wrapped.TransformResponse(ctx, response)
++	resp, err := p.wrapped.TransformResponse(ctx, response)
++	if err != nil {
++		return nil, err
++	}
++	return shared.RestoreCustomToolCallsOnResponse(resp, p.customToolBridgeDecision()), nil
+ }
+ 
+ func (p *PersistentOutboundTransformer) TransformStream(ctx context.Context, req *httpclient.Request, stream streams.Stream[*httpclient.StreamEvent]) (streams.Stream[*llm.Response], error) {
+@@ -458,7 +537,17 @@ func (p *PersistentOutboundTransformer) TransformStream(ctx context.Context, req
+ 		p.state,
+ 	)
+ 
+-	return p.wrapped.TransformStream(ctx, req, persistentStream)
++	llmStream, err := p.wrapped.TransformStream(ctx, req, persistentStream)
++	if err != nil {
++		return nil, err
++	}
++
++	decision := p.customToolBridgeDecision()
++	if decision.Enabled {
++		return shared.NewRestoreCustomToolStream(llmStream, decision), nil
++	}
++
++	return llmStream, nil
+ }
+ 
+ func (p *PersistentOutboundTransformer) AggregateStreamChunks(
+diff --git a/internal/server/orchestrator/pass_through.go b/internal/server/orchestrator/pass_through.go
+index 03c87793..78082825 100644
+--- a/internal/server/orchestrator/pass_through.go
++++ b/internal/server/orchestrator/pass_through.go
+@@ -28,6 +28,12 @@ func (p *PersistentOutboundTransformer) isPassThroughEnabled(ctx context.Context
+ 		return false
+ 	}
+ 
++	// Codex freeform→function bridging for xai_responses rewrites the request body.
++	// Pass-through would replace that body with the original client payload and undo the bridge.
++	if p.customToolBridgeDecision().Enabled {
++		return false
++	}
++
+ 	rawReq := p.state.RawProviderRequest
+ 	if rawReq == nil || rawReq.APIFormat == "" {
+ 		return false
+diff --git a/llm/transformer/shared/custom_tool_bridge.go b/llm/transformer/shared/custom_tool_bridge.go
+new file mode 100644
+index 00000000..36e56c8f
+--- /dev/null
++++ b/llm/transformer/shared/custom_tool_bridge.go
+@@ -0,0 +1,638 @@
++package shared
++
++import (
++	"encoding/json"
++	"strconv"
++	"strings"
++
++	"github.com/looplj/axonhub/llm"
++)
++
++// Metadata keys stored on llm.Request.TransformerMetadata when the bridge runs.
++const (
++	MetaCustomToolBridgeEnabled = "custom_tool_bridge_enabled"
++	MetaCustomToolBridgeNames   = "custom_tool_bridge_names"
++)
++
++// ChannelTypeXaiResponses is the AxonHub channel type that talks to xAI via
++// OpenAI Responses API and enables Codex freeform↔function tool bridging.
++const ChannelTypeXaiResponses = "xai_responses"
++
++// DefaultBridgedCustomToolNames are Responses freeform tools that xAI does not
++// accept as type=custom. Only these names are converted; shell_command / MCP
++// function tools stay untouched.
++var DefaultBridgedCustomToolNames = map[string]struct{}{
++	"apply_patch": {},
++}
++
++// BridgeDecision describes whether / how custom tools should be bridged for an
++// outbound attempt.
++type BridgeDecision struct {
++	Enabled bool
++	// Names is the set of custom tool names to bridge (matched as emitted by Codex).
++	Names map[string]struct{}
++}
++
++// ShouldBridgeCustomTools is true only when:
++//  1. the selected outbound channel type is xai_responses, and
++//  2. the inbound client request is OpenAI Responses (Codex / openai_responses).
++//
++// Ordinary xai (chat completions) channels and OpenAI Responses→OpenAI Responses
++// routes are not bridged.
++func ShouldBridgeCustomTools(channelType string, inboundFormat llm.APIFormat) bool {
++	if !strings.EqualFold(strings.TrimSpace(channelType), ChannelTypeXaiResponses) {
++		return false
++	}
++	return inboundFormat == llm.APIFormatOpenAIResponse || inboundFormat == llm.APIFormatOpenAIResponseCompact
++}
++
++// NewBridgeDecision builds a decision for the given outbound channel and inbound
++// client API format.
++func NewBridgeDecision(channelType string, inboundFormat llm.APIFormat) BridgeDecision {
++	if !ShouldBridgeCustomTools(channelType, inboundFormat) {
++		return BridgeDecision{Enabled: false}
++	}
++	names := make(map[string]struct{}, len(DefaultBridgedCustomToolNames))
++	for n := range DefaultBridgedCustomToolNames {
++		names[n] = struct{}{}
++	}
++	return BridgeDecision{Enabled: true, Names: names}
++}
++
++// BridgeRequestForOutbound converts Responses custom tool definitions and
++// history for providers that only understand standard function tools.
++//
++// Transformations:
++//   - tools: type custom (apply_patch) → type function with {input: string}
++//   - assistant tool_calls: custom_tool_call → function_call with JSON args
++//   - tool results keep the same call id (function_call_output compatible)
++//
++// Returns a shallow-cloned request when changes are made; otherwise req.
++func BridgeRequestForOutbound(req *llm.Request, decision BridgeDecision) *llm.Request {
++	if req == nil || !decision.Enabled || len(decision.Names) == 0 {
++		return req
++	}
++
++	// Always clone when the channel decision is on, so metadata is set for the
++	// response path even if this turn has no apply_patch yet (model may still
++	// return one). Also guarantees RawTools are stripped for xAI.
++	cloned := *req
++	cloned.Tools = bridgeTools(req.Tools, decision.Names)
++	cloned.Messages = bridgeMessagesOutbound(req.Messages, decision.Names)
++
++	// Drop raw Responses tool fragments so non-OpenAI Responses upstreams do
++	// not receive unconverted custom tool JSON from ProviderExtensions.
++	if cloned.ProviderExtensions != nil && cloned.ProviderExtensions.OpenAIResponses != nil &&
++		cloned.ProviderExtensions.OpenAIResponses.Request != nil {
++		reqExt := *cloned.ProviderExtensions.OpenAIResponses.Request
++		reqExt.RawTools = nil
++		reqExt.ToolSignatures = nil
++		oa := *cloned.ProviderExtensions.OpenAIResponses
++		oa.Request = &reqExt
++		pe := *cloned.ProviderExtensions
++		pe.OpenAIResponses = &oa
++		cloned.ProviderExtensions = &pe
++	}
++
++	meta := cloneMetadata(req.TransformerMetadata)
++	meta[MetaCustomToolBridgeEnabled] = true
++	meta[MetaCustomToolBridgeNames] = bridgedNameList(decision.Names)
++	cloned.TransformerMetadata = meta
++
++	return &cloned
++}
++
++// RestoreCustomToolCallsOnResponse converts function-style apply_patch calls
++// from the upstream model back into Responses custom_tool_call so Codex can
++// execute them without aborting.
++func RestoreCustomToolCallsOnResponse(resp *llm.Response, decision BridgeDecision) *llm.Response {
++	if resp == nil || !decision.Enabled || len(decision.Names) == 0 {
++		return resp
++	}
++	if !responseNeedsCustomRestore(resp, decision.Names) {
++		return resp
++	}
++
++	cloned := *resp
++	cloned.Choices = make([]llm.Choice, len(resp.Choices))
++	for i, choice := range resp.Choices {
++		cloned.Choices[i] = choice
++		if choice.Message != nil {
++			msg := *choice.Message
++			msg.ToolCalls = restoreToolCalls(choice.Message.ToolCalls, decision.Names)
++			cloned.Choices[i].Message = &msg
++		}
++		if choice.Delta != nil {
++			delta := *choice.Delta
++			delta.ToolCalls = restoreToolCalls(choice.Delta.ToolCalls, decision.Names)
++			cloned.Choices[i].Delta = &delta
++		}
++	}
++	return &cloned
++}
++
++// BridgeDecisionFromRequest reads bridge flags written by BridgeRequestForOutbound.
++func BridgeDecisionFromRequest(req *llm.Request) BridgeDecision {
++	if req == nil || req.TransformerMetadata == nil {
++		return BridgeDecision{}
++	}
++	enabled, _ := req.TransformerMetadata[MetaCustomToolBridgeEnabled].(bool)
++	if !enabled {
++		return BridgeDecision{}
++	}
++	names := map[string]struct{}{}
++	switch v := req.TransformerMetadata[MetaCustomToolBridgeNames].(type) {
++	case []string:
++		for _, n := range v {
++			names[n] = struct{}{}
++		}
++	case []any:
++		for _, item := range v {
++			if s, ok := item.(string); ok {
++				names[s] = struct{}{}
++			}
++		}
++	}
++	if len(names) == 0 {
++		for n := range DefaultBridgedCustomToolNames {
++			names[n] = struct{}{}
++		}
++	}
++	return BridgeDecision{Enabled: true, Names: names}
++}
++
++// --- internals ---
++
++func requestNeedsCustomToolBridge(req *llm.Request, names map[string]struct{}) bool {
++	for _, t := range req.Tools {
++		if t.Type == llm.ToolTypeResponsesCustomTool && t.ResponseCustomTool != nil {
++			if _, ok := names[t.ResponseCustomTool.Name]; ok {
++				return true
++			}
++		}
++	}
++	for _, msg := range req.Messages {
++		for _, tc := range msg.ToolCalls {
++			if name, ok := customToolCallName(tc); ok {
++				if _, allowed := names[name]; allowed {
++					return true
++				}
++			}
++		}
++	}
++	return false
++}
++
++func responseNeedsCustomRestore(resp *llm.Response, names map[string]struct{}) bool {
++	for _, choice := range resp.Choices {
++		if choice.Message != nil {
++			for _, tc := range choice.Message.ToolCalls {
++				if shouldRestoreToolCall(tc, names) {
++					return true
++				}
++			}
++		}
++		if choice.Delta != nil {
++			for _, tc := range choice.Delta.ToolCalls {
++				if shouldRestoreToolCall(tc, names) {
++					return true
++				}
++			}
++		}
++	}
++	return false
++}
++
++func shouldRestoreToolCall(tc llm.ToolCall, names map[string]struct{}) bool {
++	// Already custom — nothing to do.
++	if tc.ResponseCustomToolCall != nil {
++		return false
++	}
++	name := tc.Function.Name
++	if name == "" {
++		return false
++	}
++	_, ok := names[name]
++	return ok
++}
++
++func bridgeTools(tools []llm.Tool, names map[string]struct{}) []llm.Tool {
++	if len(tools) == 0 {
++		return tools
++	}
++	out := make([]llm.Tool, 0, len(tools))
++	for _, t := range tools {
++		if t.Type == llm.ToolTypeResponsesCustomTool && t.ResponseCustomTool != nil {
++			if _, ok := names[t.ResponseCustomTool.Name]; ok {
++				out = append(out, customToolToFunctionTool(t.ResponseCustomTool))
++				continue
++			}
++		}
++		out = append(out, t)
++	}
++	return out
++}
++
++func customToolToFunctionTool(custom *llm.ResponseCustomTool) llm.Tool {
++	desc := custom.Description
++	if desc == "" {
++		desc = "Apply a freeform patch to edit files. Pass the full patch text (*** Begin Patch ... *** End Patch) as the input string. Do not wrap the patch in additional JSON beyond the function arguments object."
++	} else {
++		desc = desc + "\n\nIMPORTANT: This tool is exposed as a standard function tool. Put the entire freeform patch text in the \"input\" string argument (*** Begin Patch ... *** End Patch). Do not use a freeform/custom tool envelope."
++	}
++
++	params, _ := json.Marshal(map[string]any{
++		"type": "object",
++		"properties": map[string]any{
++			"input": map[string]any{
++				"type":        "string",
++				"description": "Full freeform patch body for apply_patch, including *** Begin Patch and *** End Patch markers.",
++			},
++		},
++		"required":             []string{"input"},
++		"additionalProperties": false,
++	})
++
++	return llm.Tool{
++		Type: llm.ToolTypeFunction,
++		Function: llm.Function{
++			Name:        custom.Name,
++			Description: desc,
++			Parameters:  params,
++		},
++	}
++}
++
++func bridgeMessagesOutbound(messages []llm.Message, names map[string]struct{}) []llm.Message {
++	if len(messages) == 0 {
++		return messages
++	}
++	out := make([]llm.Message, len(messages))
++	for i, msg := range messages {
++		out[i] = msg
++		if len(msg.ToolCalls) == 0 {
++			continue
++		}
++		out[i].ToolCalls = bridgeToolCallsOutbound(msg.ToolCalls, names)
++	}
++	return out
++}
++
++func bridgeToolCallsOutbound(calls []llm.ToolCall, names map[string]struct{}) []llm.ToolCall {
++	out := make([]llm.ToolCall, 0, len(calls))
++	for _, tc := range calls {
++		name, isCustom := customToolCallName(tc)
++		if !isCustom {
++			out = append(out, tc)
++			continue
++		}
++		if _, ok := names[name]; !ok {
++			out = append(out, tc)
++			continue
++		}
++		input := ""
++		callID := tc.ID
++		if tc.ResponseCustomToolCall != nil {
++			input = tc.ResponseCustomToolCall.Input
++			if tc.ResponseCustomToolCall.CallID != "" {
++				callID = tc.ResponseCustomToolCall.CallID
++			}
++		}
++		args, _ := json.Marshal(map[string]string{"input": input})
++		out = append(out, llm.ToolCall{
++			ID:    callID,
++			Type:  llm.ToolTypeFunction,
++			Index: tc.Index,
++			Function: llm.FunctionCall{
++				Name:      name,
++				Arguments: string(args),
++			},
++			CacheControl:        tc.CacheControl,
++			TransformerMetadata: tc.TransformerMetadata,
++		})
++	}
++	return out
++}
++
++func restoreToolCalls(calls []llm.ToolCall, names map[string]struct{}) []llm.ToolCall {
++	if len(calls) == 0 {
++		return calls
++	}
++	out := make([]llm.ToolCall, 0, len(calls))
++	for _, tc := range calls {
++		if !shouldRestoreToolCall(tc, names) {
++			out = append(out, tc)
++			continue
++		}
++		input := ExtractBridgedInput(tc.Function.Arguments)
++		callID := tc.ID
++		if callID == "" && tc.ResponseCustomToolCall != nil {
++			callID = tc.ResponseCustomToolCall.CallID
++		}
++		// Streaming deltas may send only a name first (empty arguments). Still
++		// retype as custom so the client starts a custom_tool_call item.
++		out = append(out, llm.ToolCall{
++			ID:    callID,
++			Type:  llm.ToolTypeResponsesCustomTool,
++			Index: tc.Index,
++			ResponseCustomToolCall: &llm.ResponseCustomToolCall{
++				CallID: callID,
++				Name:   tc.Function.Name,
++				Input:  input,
++			},
++			// Keep Function populated for any intermediate consumers that read it.
++			Function:            tc.Function,
++			CacheControl:        tc.CacheControl,
++			TransformerMetadata: tc.TransformerMetadata,
++		})
++	}
++	return out
++}
++
++// ExtractBridgedInput pulls freeform patch text from function arguments.
++// Accepts {"input":"..."}, {"patch":"..."}, or a bare non-JSON string.
++func ExtractBridgedInput(arguments string) string {
++	arguments = strings.TrimSpace(arguments)
++	if arguments == "" {
++		return ""
++	}
++
++	var obj map[string]any
++	if err := json.Unmarshal([]byte(arguments), &obj); err == nil {
++		for _, key := range []string{"input", "patch", "content", "text"} {
++			if v, ok := obj[key]; ok {
++				switch s := v.(type) {
++				case string:
++					return s
++				default:
++					b, _ := json.Marshal(s)
++					return string(b)
++				}
++			}
++		}
++		// Single-key object whose value is a string — use it.
++		if len(obj) == 1 {
++			for _, v := range obj {
++				if s, ok := v.(string); ok {
++					return s
++				}
++			}
++		}
++		return arguments
++	}
++
++	// Not JSON — treat entire arguments as freeform input.
++	return arguments
++}
++
++func customToolCallName(tc llm.ToolCall) (string, bool) {
++	if tc.ResponseCustomToolCall != nil && tc.ResponseCustomToolCall.Name != "" {
++		return tc.ResponseCustomToolCall.Name, true
++	}
++	if tc.Type == llm.ToolTypeResponsesCustomTool && tc.Function.Name != "" {
++		return tc.Function.Name, true
++	}
++	return "", false
++}
++
++func bridgedNameList(names map[string]struct{}) []string {
++	out := make([]string, 0, len(names))
++	for n := range names {
++		out = append(out, n)
++	}
++	return out
++}
++
++func cloneMetadata(src map[string]any) map[string]any {
++	if src == nil {
++		return map[string]any{}
++	}
++	out := make(map[string]any, len(src)+2)
++	for k, v := range src {
++		out[k] = v
++	}
++	return out
++}
++
++// responseStream is the subset of streams.Stream[*llm.Response] we need.
++type responseStream interface {
++	Next() bool
++	Current() *llm.Response
++	Err() error
++	Close() error
++}
++
++// restoreCustomToolStream wraps an llm.Response stream and restores bridged
++// function tool calls to custom form on every chunk. It tracks accumulated
++// function arguments so partial JSON deltas are converted into freeform input
++// deltas instead of dumping raw JSON fragments to Codex.
++type restoreCustomToolStream struct {
++	inner    responseStream
++	decision BridgeDecision
++	// accumArgs is call-key → concatenated function.arguments so far.
++	accumArgs map[string]string
++	// emittedInput is call-key → freeform input already sent to the client.
++	emittedInput map[string]string
++	current      *llm.Response
++}
++
++// NewRestoreCustomToolStream returns a stream that maps function apply_patch
++// calls back to Responses custom_tool_call shape.
++func NewRestoreCustomToolStream(inner responseStream, decision BridgeDecision) *restoreCustomToolStream {
++	return &restoreCustomToolStream{
++		inner:        inner,
++		decision:     decision,
++		accumArgs:    map[string]string{},
++		emittedInput: map[string]string{},
++	}
++}
++
++func (s *restoreCustomToolStream) Next() bool {
++	if !s.inner.Next() {
++		s.current = nil
++		return false
++	}
++	s.current = s.restoreStreamChunk(s.inner.Current())
++	return true
++}
++
++func (s *restoreCustomToolStream) Current() *llm.Response {
++	return s.current
++}
++
++func (s *restoreCustomToolStream) Err() error {
++	return s.inner.Err()
++}
++
++func (s *restoreCustomToolStream) Close() error {
++	return s.inner.Close()
++}
++
++func (s *restoreCustomToolStream) restoreStreamChunk(resp *llm.Response) *llm.Response {
++	if resp == nil || !s.decision.Enabled {
++		return resp
++	}
++	// Non-stream complete message path.
++	if len(resp.Choices) > 0 && resp.Choices[0].Message != nil && len(resp.Choices[0].Message.ToolCalls) > 0 {
++		return RestoreCustomToolCallsOnResponse(resp, s.decision)
++	}
++
++	cloned := *resp
++	cloned.Choices = make([]llm.Choice, len(resp.Choices))
++	for i, choice := range resp.Choices {
++		cloned.Choices[i] = choice
++		if choice.Delta == nil || len(choice.Delta.ToolCalls) == 0 {
++			continue
++		}
++		delta := *choice.Delta
++		delta.ToolCalls = s.restoreStreamToolCalls(choice.Delta.ToolCalls)
++		cloned.Choices[i].Delta = &delta
++	}
++	return &cloned
++}
++
++func (s *restoreCustomToolStream) restoreStreamToolCalls(calls []llm.ToolCall) []llm.ToolCall {
++	out := make([]llm.ToolCall, 0, len(calls))
++	for _, tc := range calls {
++		if !shouldRestoreToolCall(tc, s.decision.Names) {
++			out = append(out, tc)
++			continue
++		}
++		key := streamCallKey(tc)
++		s.accumArgs[key] += tc.Function.Arguments
++
++		// Prefer progressive extraction of the "input" field; fall back to empty
++		// until JSON is complete enough to parse.
++		fullInput := progressiveExtractInput(s.accumArgs[key])
++		prev := s.emittedInput[key]
++		deltaInput := ""
++		if strings.HasPrefix(fullInput, prev) {
++			deltaInput = fullInput[len(prev):]
++			s.emittedInput[key] = fullInput
++		} else if fullInput != "" {
++			// Extraction rewound (rare) — send full remaining text once.
++			deltaInput = fullInput
++			s.emittedInput[key] = fullInput
++		}
++
++		callID := tc.ID
++		name := tc.Function.Name
++		out = append(out, llm.ToolCall{
++			ID:    callID,
++			Type:  llm.ToolTypeResponsesCustomTool,
++			Index: tc.Index,
++			ResponseCustomToolCall: &llm.ResponseCustomToolCall{
++				CallID: callID,
++				Name:   name,
++				Input:  deltaInput,
++			},
++			Function:            tc.Function,
++			CacheControl:        tc.CacheControl,
++			TransformerMetadata: tc.TransformerMetadata,
++		})
++	}
++	return out
++}
++
++func streamCallKey(tc llm.ToolCall) string {
++	if tc.ID != "" {
++		return tc.ID
++	}
++	return "idx:" + strconv.Itoa(tc.Index) + ":" + tc.Function.Name
++}
++
++// progressiveExtractInput tries to read the freeform input from a possibly
++// incomplete JSON arguments buffer. Returns "" until a usable prefix is known.
++func progressiveExtractInput(accum string) string {
++	accum = strings.TrimSpace(accum)
++	if accum == "" {
++		return ""
++	}
++	// Complete JSON first.
++	if in := ExtractBridgedInput(accum); in != "" && (strings.HasPrefix(accum, "{") || strings.HasPrefix(accum, "\"")) {
++		// ExtractBridgedInput returns the whole string when not JSON — only trust
++		// it when unmarshalling succeeded (object form).
++		var obj map[string]any
++		if err := json.Unmarshal([]byte(accum), &obj); err == nil {
++			return ExtractBridgedInput(accum)
++		}
++	}
++	// Partial: look for "input" / "patch" string prefix patterns.
++	for _, key := range []string{`"input"`, `"patch"`} {
++		idx := strings.Index(accum, key)
++		if idx < 0 {
++			continue
++		}
++		rest := accum[idx+len(key):]
++		// skip whitespace and colon
++		rest = strings.TrimLeft(rest, " \t\n\r")
++		if !strings.HasPrefix(rest, ":") {
++			continue
++		}
++		rest = strings.TrimLeft(rest[1:], " \t\n\r")
++		if !strings.HasPrefix(rest, `"`) {
++			continue
++		}
++		// Decode a possibly truncated JSON string after the opening quote.
++		return decodePartialJSONString(rest[1:])
++	}
++	return ""
++}
++
++// decodePartialJSONString decodes a JSON string body that may be truncated
++// (no closing quote yet). Returns the decoded runes so far.
++func decodePartialJSONString(s string) string {
++	var b strings.Builder
++	for i := 0; i < len(s); i++ {
++		c := s[i]
++		if c == '"' {
++			// End of string.
++			break
++		}
++		if c == '\\' {
++			if i+1 >= len(s) {
++				// Trailing escape — wait for more data.
++				break
++			}
++			i++
++			switch s[i] {
++			case '"', '\\', '/':
++				b.WriteByte(s[i])
++			case 'n':
++				b.WriteByte('\n')
++			case 'r':
++				b.WriteByte('\r')
++			case 't':
++				b.WriteByte('\t')
++			case 'u':
++				// Incomplete \uXXXX — stop.
++				if i+4 >= len(s) {
++					return b.String()
++				}
++				var r rune
++				for j := 0; j < 4; j++ {
++					i++
++					h := s[i]
++					var v rune
++					switch {
++					case h >= '0' && h <= '9':
++						v = rune(h - '0')
++					case h >= 'a' && h <= 'f':
++						v = rune(h-'a') + 10
++					case h >= 'A' && h <= 'F':
++						v = rune(h-'A') + 10
++					default:
++						return b.String()
++					}
++					r = r<<4 | v
++				}
++				b.WriteRune(r)
++			default:
++				b.WriteByte(s[i])
++			}
++			continue
++		}
++		b.WriteByte(c)
++	}
++	return b.String()
++}
+diff --git a/llm/transformer/shared/custom_tool_bridge_test.go b/llm/transformer/shared/custom_tool_bridge_test.go
+new file mode 100644
+index 00000000..5b166ce8
+--- /dev/null
++++ b/llm/transformer/shared/custom_tool_bridge_test.go
+@@ -0,0 +1,273 @@
++package shared
++
++import (
++	"encoding/json"
++	"testing"
++
++	"github.com/stretchr/testify/require"
++
++	"github.com/looplj/axonhub/llm"
++)
++
++func TestShouldBridgeCustomTools(t *testing.T) {
++	t.Parallel()
++
++	// Only xai_responses channel + inbound OpenAI Responses (Codex).
++	require.True(t, ShouldBridgeCustomTools(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse))
++	require.True(t, ShouldBridgeCustomTools("xai_responses", llm.APIFormatOpenAIResponseCompact))
++	// Plain xai (chat completions) is not bridged.
++	require.False(t, ShouldBridgeCustomTools("xai", llm.APIFormatOpenAIResponse))
++	// OpenAI Responses channel keeps native freeform.
++	require.False(t, ShouldBridgeCustomTools("openai_responses", llm.APIFormatOpenAIResponse))
++	// Chat-completions inbound is not bridged even on xai_responses.
++	require.False(t, ShouldBridgeCustomTools(ChannelTypeXaiResponses, llm.APIFormatOpenAIChatCompletion))
++	require.False(t, ShouldBridgeCustomTools("anthropic", llm.APIFormatOpenAIResponse))
++}
++
++func TestBridgeRequestForOutbound_ToolsAndHistory(t *testing.T) {
++	t.Parallel()
++
++	patch := "*** Begin Patch\n*** Update File: a.go\n@@\n-old\n+new\n*** End Patch"
++	req := &llm.Request{
++		Model:     "grok-4.5",
++		APIFormat: llm.APIFormatOpenAIResponse,
++		Tools: []llm.Tool{
++			{
++				Type: llm.ToolTypeResponsesCustomTool,
++				ResponseCustomTool: &llm.ResponseCustomTool{
++					Name:        "apply_patch",
++					Description: "Edit files with a patch.",
++				},
++			},
++			{
++				Type: llm.ToolTypeFunction,
++				Function: llm.Function{
++					Name:        "shell_command",
++					Description: "Run shell",
++					Parameters:  json.RawMessage(`{"type":"object"}`),
++				},
++			},
++		},
++		Messages: []llm.Message{
++			{Role: "user", Content: llm.MessageContent{Content: strPtr("edit a.go")}},
++			{
++				Role: "assistant",
++				ToolCalls: []llm.ToolCall{
++					{
++						ID:   "call_1",
++						Type: llm.ToolTypeResponsesCustomTool,
++						ResponseCustomToolCall: &llm.ResponseCustomToolCall{
++							CallID: "call_1",
++							Name:   "apply_patch",
++							Input:  patch,
++						},
++					},
++				},
++			},
++			{
++				Role:       "tool",
++				ToolCallID: strPtr("call_1"),
++				Content:    llm.MessageContent{Content: strPtr("Success")},
++			},
++		},
++	}
++
++	decision := NewBridgeDecision(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse)
++	out := BridgeRequestForOutbound(req, decision)
++	require.NotSame(t, req, out)
++
++	// apply_patch became function; shell stayed function.
++	require.Len(t, out.Tools, 2)
++	require.Equal(t, llm.ToolTypeFunction, out.Tools[0].Type)
++	require.Equal(t, "apply_patch", out.Tools[0].Function.Name)
++	require.Contains(t, string(out.Tools[0].Function.Parameters), `"input"`)
++	require.Equal(t, "shell_command", out.Tools[1].Function.Name)
++
++	// History custom_tool_call → function_call with JSON args.
++	require.Len(t, out.Messages[1].ToolCalls, 1)
++	tc := out.Messages[1].ToolCalls[0]
++	require.Equal(t, llm.ToolTypeFunction, tc.Type)
++	require.Equal(t, "apply_patch", tc.Function.Name)
++	require.Nil(t, tc.ResponseCustomToolCall)
++	require.Equal(t, patch, ExtractBridgedInput(tc.Function.Arguments))
++	require.Equal(t, "call_1", tc.ID)
++
++	// Tool result id preserved.
++	require.Equal(t, "call_1", *out.Messages[2].ToolCallID)
++
++	// Metadata set.
++	require.True(t, out.TransformerMetadata[MetaCustomToolBridgeEnabled].(bool))
++
++	// Original request untouched.
++	require.Equal(t, llm.ToolTypeResponsesCustomTool, req.Tools[0].Type)
++}
++
++func TestBridgeRequestForOutbound_SkipsNonXaiResponsesChannel(t *testing.T) {
++	t.Parallel()
++
++	req := &llm.Request{
++		Model: "gpt-5.6-sol",
++		Tools: []llm.Tool{{
++			Type: llm.ToolTypeResponsesCustomTool,
++			ResponseCustomTool: &llm.ResponseCustomTool{
++				Name: "apply_patch",
++			},
++		}},
++	}
++	decision := NewBridgeDecision("openai_responses", llm.APIFormatOpenAIResponse)
++	out := BridgeRequestForOutbound(req, decision)
++	require.Same(t, req, out)
++	require.Equal(t, llm.ToolTypeResponsesCustomTool, out.Tools[0].Type)
++}
++
++func TestBridgeRequestForOutbound_AlwaysClonesWhenDecisionEnabled(t *testing.T) {
++	t.Parallel()
++
++	// No apply_patch in tools — still clone so metadata is set for response restore.
++	req := &llm.Request{
++		Model:     "grok-4.5",
++		APIFormat: llm.APIFormatOpenAIResponse,
++		Tools: []llm.Tool{{
++			Type: llm.ToolTypeFunction,
++			Function: llm.Function{
++				Name: "shell_command",
++			},
++		}},
++	}
++	decision := NewBridgeDecision(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse)
++	out := BridgeRequestForOutbound(req, decision)
++	require.NotSame(t, req, out)
++	require.True(t, out.TransformerMetadata[MetaCustomToolBridgeEnabled].(bool))
++	require.Equal(t, "shell_command", out.Tools[0].Function.Name)
++}
++
++func TestRestoreCustomToolCallsOnResponse(t *testing.T) {
++	t.Parallel()
++
++	patch := "*** Begin Patch\n*** End Patch"
++	args, err := json.Marshal(map[string]string{"input": patch})
++	require.NoError(t, err)
++
++	resp := &llm.Response{
++		Choices: []llm.Choice{{
++			Message: &llm.Message{
++				Role: "assistant",
++				ToolCalls: []llm.ToolCall{{
++					ID:   "call_xyz",
++					Type: llm.ToolTypeFunction,
++					Function: llm.FunctionCall{
++						Name:      "apply_patch",
++						Arguments: string(args),
++					},
++				}},
++			},
++		}},
++	}
++
++	decision := NewBridgeDecision(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse)
++	out := RestoreCustomToolCallsOnResponse(resp, decision)
++	require.NotNil(t, out.Choices[0].Message)
++	tc := out.Choices[0].Message.ToolCalls[0]
++	require.Equal(t, llm.ToolTypeResponsesCustomTool, tc.Type)
++	require.NotNil(t, tc.ResponseCustomToolCall)
++	require.Equal(t, "apply_patch", tc.ResponseCustomToolCall.Name)
++	require.Equal(t, patch, tc.ResponseCustomToolCall.Input)
++	require.Equal(t, "call_xyz", tc.ResponseCustomToolCall.CallID)
++}
++
++func TestExtractBridgedInput(t *testing.T) {
++	t.Parallel()
++
++	require.Equal(t, "hello", ExtractBridgedInput(`{"input":"hello"}`))
++	require.Equal(t, "p", ExtractBridgedInput(`{"patch":"p"}`))
++	require.Equal(t, "*** Begin Patch", ExtractBridgedInput("*** Begin Patch"))
++	require.Equal(t, "", ExtractBridgedInput(""))
++}
++
++func TestRestoreCustomToolStream_ProgressiveInput(t *testing.T) {
++	t.Parallel()
++
++	decision := NewBridgeDecision(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse)
++	chunks := []*llm.Response{
++		{
++			Choices: []llm.Choice{{
++				Delta: &llm.Message{
++					ToolCalls: []llm.ToolCall{{
++						ID:   "c1",
++						Type: llm.ToolTypeFunction,
++						Function: llm.FunctionCall{
++							Name:      "apply_patch",
++							Arguments: `{"input":"`,
++						},
++					}},
++				},
++			}},
++		},
++		{
++			Choices: []llm.Choice{{
++				Delta: &llm.Message{
++					ToolCalls: []llm.ToolCall{{
++						ID:   "c1",
++						Type: llm.ToolTypeFunction,
++						Function: llm.FunctionCall{
++							Name:      "apply_patch",
++							Arguments: `*** Begin Patch\n*** End Patch"}`,
++						},
++					}},
++				},
++			}},
++		},
++	}
++
++	stream := NewRestoreCustomToolStream(&sliceResponseStream{items: chunks}, decision)
++	require.True(t, stream.Next())
++	// First chunk may not yet have a closed JSON string — input delta can be empty.
++	first := stream.Current()
++	require.NotNil(t, first.Choices[0].Delta)
++	require.Equal(t, llm.ToolTypeResponsesCustomTool, first.Choices[0].Delta.ToolCalls[0].Type)
++
++	require.True(t, stream.Next())
++	second := stream.Current()
++	tc := second.Choices[0].Delta.ToolCalls[0]
++	require.Equal(t, llm.ToolTypeResponsesCustomTool, tc.Type)
++	require.Contains(t, tc.ResponseCustomToolCall.Input, "Begin Patch")
++	require.False(t, stream.Next())
++}
++
++func TestBridgeDecisionFromRequest(t *testing.T) {
++	t.Parallel()
++
++	req := &llm.Request{
++		TransformerMetadata: map[string]any{
++			MetaCustomToolBridgeEnabled: true,
++			MetaCustomToolBridgeNames:   []string{"apply_patch"},
++		},
++	}
++	d := BridgeDecisionFromRequest(req)
++	require.True(t, d.Enabled)
++	_, ok := d.Names["apply_patch"]
++	require.True(t, ok)
++}
++
++func strPtr(s string) *string { return &s }
++
++// sliceResponseStream is a tiny test double for streams.Stream[*llm.Response].
++type sliceResponseStream struct {
++	items []*llm.Response
++	i     int
++	cur   *llm.Response
++}
++
++func (s *sliceResponseStream) Next() bool {
++	if s.i >= len(s.items) {
++		s.cur = nil
++		return false
++	}
++	s.cur = s.items[s.i]
++	s.i++
++	return true
++}
++
++func (s *sliceResponseStream) Current() *llm.Response { return s.cur }
++func (s *sliceResponseStream) Err() error             { return nil }
++func (s *sliceResponseStream) Close() error           { return nil }
+-- 
+2.54.0.windows.1
+
