@@ -602,6 +602,11 @@ func convertItemToMessage(item *Item) (*llm.Message, error) {
 
 		return msg, nil
 
+	case "agent_message":
+		// Codex multi-agent inter-agent messages are not part of public OpenAI/xAI
+		// Responses ModelInput. Convert to a plain user message so CPA/xAI accept them.
+		return agentMessageItemToUserMessage(item), nil
+
 	case "reasoning":
 		// Reasoning is handled by convertReasoningWithFollowing in convertInputToMessages
 		// This case should not be reached in normal flow, but return nil to skip if it does
@@ -1139,4 +1144,38 @@ func buildReasoningItems(msg llm.Message) []Item {
 	}
 
 	return items
+}
+
+
+// agentMessageItemToUserMessage converts a Codex agent_message input item into a
+// standard user message for non-Codex Responses upstreams (xAI, etc.).
+func agentMessageItemToUserMessage(item *Item) *llm.Message {
+	if item == nil {
+		return nil
+	}
+	var b strings.Builder
+	if item.Author != "" || item.Recipient != "" {
+		fmt.Fprintf(&b, "[Codex agent_message author=%s recipient=%s]\n", item.Author, item.Recipient)
+	}
+	if item.Content != nil {
+		for _, part := range convertToMessageContentParts(*item.Content) {
+			if part.Text != nil && strings.TrimSpace(*part.Text) != "" {
+				b.WriteString(*part.Text)
+				if !strings.HasSuffix(*part.Text, "\n") {
+					b.WriteByte('\n')
+				}
+			}
+		}
+	}
+	text := strings.TrimSpace(b.String())
+	if text == "" {
+		text = "[Codex agent_message with no plaintext content]"
+	}
+	return &llm.Message{
+		ID:   item.ID,
+		Role: "user",
+		Content: llm.MessageContent{
+			Content: lo.ToPtr(text),
+		},
+	}
 }

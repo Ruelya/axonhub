@@ -2,6 +2,8 @@ package responses
 
 import (
 	"encoding/json"
+	"strings"
+	"fmt"
 
 	"github.com/looplj/axonhub/llm"
 )
@@ -186,16 +188,67 @@ func buildRawOnlyInputFragments(input Input, rawItems []json.RawMessage) []llm.O
 	return fragments
 }
 
+func convertAgentMessageRawToUserMessage(raw json.RawMessage) (json.RawMessage, bool) {
+	var am struct {
+		ID        string `json:"id"`
+		Author    string `json:"author"`
+		Recipient string `json:"recipient"`
+		Content   []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(raw, &am); err != nil {
+		return nil, false
+	}
+	var b strings.Builder
+	if am.Author != "" || am.Recipient != "" {
+		fmt.Fprintf(&b, "[Codex agent_message author=%s recipient=%s]\n", am.Author, am.Recipient)
+	}
+	for _, p := range am.Content {
+		switch p.Type {
+		case "input_text", "output_text", "text":
+			if strings.TrimSpace(p.Text) != "" {
+				b.WriteString(p.Text)
+				if !strings.HasSuffix(p.Text, "\n") {
+					b.WriteByte('\n')
+				}
+			}
+		}
+	}
+	text := strings.TrimSpace(b.String())
+	if text == "" {
+		text = "[Codex agent_message with no plaintext content]"
+	}
+	msg := map[string]any{
+		"type": "message",
+		"role": "user",
+		"content": []map[string]string{
+			{"type": "input_text", "text": text},
+		},
+	}
+	if am.ID != "" {
+		msg["id"] = am.ID
+	}
+	out, err := json.Marshal(msg)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
+}
+
 func isStructurallyRepresentedInputItem(itemType string) bool {
 	switch itemType {
 	case "", "message", "input_text", "input_image", "function_call", "function_call_output",
-		"custom_tool_call", "custom_tool_call_output", "reasoning", "compaction", "compaction_summary":
+		"custom_tool_call", "custom_tool_call_output", "reasoning", "compaction", "compaction_summary",
+		// Converted to a plain user message in inbound convertItemToMessage — must NOT be
+		// re-injected as a raw Codex-only fragment (xAI/CPA reject agent_message → 422 ModelInput).
+		"agent_message":
 		return true
 	default:
 		return false
 	}
 }
-
 func openAIResponsesRequestExtensions(llmReq *llm.Request) *llm.OpenAIResponsesRequestExtensions {
 	if llmReq == nil || llmReq.ProviderExtensions == nil || llmReq.ProviderExtensions.OpenAIResponses == nil {
 		return nil
@@ -269,6 +322,16 @@ func mergeRawOnlyInputItems(structuredRaw json.RawMessage, requestExt *llm.OpenA
 
 	for i := 0; i < total; i++ {
 		if raw, ok := rawByIndex[i]; ok {
+			// Defensive: never forward Codex-only agent_message to non-native upstreams.
+			var peek struct {
+				Type string `json:"type"`
+			}
+			_ = json.Unmarshal(raw, &peek)
+			if peek.Type == "agent_message" {
+				if converted, cok := convertAgentMessageRawToUserMessage(raw); cok {
+					raw = converted
+				}
+			}
 			items = append(items, raw)
 			continue
 		}

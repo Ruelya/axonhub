@@ -533,6 +533,10 @@ type Item struct {
 	// For output message items: array of ContentItem (stored as []Item with Type="output_text").
 	Content *Input `json:"content,omitempty"`
 
+	// Codex multi-agent fields (type="agent_message").
+	Author    string `json:"author,omitempty"`
+	Recipient string `json:"recipient,omitempty"`
+
 	// Status of the item.
 	// Any of "in_progress", "completed", "incomplete".
 	Status *string `json:"status,omitempty"`
