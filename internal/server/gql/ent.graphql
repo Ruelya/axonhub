@@ -1800,6 +1800,18 @@ input CreateRequestInput {
   status: RequestStatus!
   stream: Boolean
   clientIP: String
+  """
+  Detected client profile id from headers / User-Agent
+  """
+  clientProfile: String
+  """
+  How the client was identified: explicit, user_agent, or none
+  """
+  clientDetectSource: String
+  """
+  Whether AxonHub applied client-compat response patches on the wire
+  """
+  clientCompatApplied: Boolean
   metricsLatencyMs: Int
   metricsFirstTokenLatencyMs: Int
   """
@@ -4432,6 +4444,18 @@ type Request implements Node {
   status: RequestStatus!
   stream: Boolean!
   clientIP: String!
+  """
+  Detected client profile id from headers / User-Agent
+  """
+  clientProfile: String
+  """
+  How the client was identified: explicit, user_agent, or none
+  """
+  clientDetectSource: String
+  """
+  Whether AxonHub applied client-compat response patches on the wire
+  """
+  clientCompatApplied: Boolean!
   metricsLatencyMs: Int
   metricsFirstTokenLatencyMs: Int
   """
@@ -5131,6 +5155,47 @@ input RequestWhereInput {
   clientIPHasSuffix: String
   clientIPEqualFold: String
   clientIPContainsFold: String
+  """
+  client_profile field predicates
+  """
+  clientProfile: String
+  clientProfileNEQ: String
+  clientProfileIn: [String!]
+  clientProfileNotIn: [String!]
+  clientProfileGT: String
+  clientProfileGTE: String
+  clientProfileLT: String
+  clientProfileLTE: String
+  clientProfileContains: String
+  clientProfileHasPrefix: String
+  clientProfileHasSuffix: String
+  clientProfileIsNil: Boolean
+  clientProfileNotNil: Boolean
+  clientProfileEqualFold: String
+  clientProfileContainsFold: String
+  """
+  client_detect_source field predicates
+  """
+  clientDetectSource: String
+  clientDetectSourceNEQ: String
+  clientDetectSourceIn: [String!]
+  clientDetectSourceNotIn: [String!]
+  clientDetectSourceGT: String
+  clientDetectSourceGTE: String
+  clientDetectSourceLT: String
+  clientDetectSourceLTE: String
+  clientDetectSourceContains: String
+  clientDetectSourceHasPrefix: String
+  clientDetectSourceHasSuffix: String
+  clientDetectSourceIsNil: Boolean
+  clientDetectSourceNotNil: Boolean
+  clientDetectSourceEqualFold: String
+  clientDetectSourceContainsFold: String
+  """
+  client_compat_applied field predicates
+  """
+  clientCompatApplied: Boolean
+  clientCompatAppliedNEQ: Boolean
   """
   metrics_latency_ms field predicates
   """
@@ -6276,6 +6341,20 @@ input UpdateRequestInput {
   externalID: String
   clearExternalID: Boolean
   status: RequestStatus
+  """
+  Detected client profile id from headers / User-Agent
+  """
+  clientProfile: String
+  clearClientProfile: Boolean
+  """
+  How the client was identified: explicit, user_agent, or none
+  """
+  clientDetectSource: String
+  clearClientDetectSource: Boolean
+  """
+  Whether AxonHub applied client-compat response patches on the wire
+  """
+  clientCompatApplied: Boolean
   metricsLatencyMs: Int
   clearMetricsLatencyMs: Boolean
   metricsFirstTokenLatencyMs: Int

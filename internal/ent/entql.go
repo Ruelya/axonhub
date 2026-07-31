@@ -412,6 +412,9 @@ var schemaGraph = func() *sqlgraph.Schema {
 			request.FieldStatus:                     {Type: field.TypeEnum, Column: request.FieldStatus},
 			request.FieldStream:                     {Type: field.TypeBool, Column: request.FieldStream},
 			request.FieldClientIP:                   {Type: field.TypeString, Column: request.FieldClientIP},
+			request.FieldClientProfile:              {Type: field.TypeString, Column: request.FieldClientProfile},
+			request.FieldClientDetectSource:         {Type: field.TypeString, Column: request.FieldClientDetectSource},
+			request.FieldClientCompatApplied:        {Type: field.TypeBool, Column: request.FieldClientCompatApplied},
 			request.FieldMetricsLatencyMs:           {Type: field.TypeInt64, Column: request.FieldMetricsLatencyMs},
 			request.FieldMetricsFirstTokenLatencyMs: {Type: field.TypeInt64, Column: request.FieldMetricsFirstTokenLatencyMs},
 			request.FieldMetricsReasoningDurationMs: {Type: field.TypeInt64, Column: request.FieldMetricsReasoningDurationMs},
@@ -3327,6 +3330,21 @@ func (f *RequestFilter) WhereStream(p entql.BoolP) {
 // WhereClientIP applies the entql string predicate on the client_ip field.
 func (f *RequestFilter) WhereClientIP(p entql.StringP) {
 	f.Where(p.Field(request.FieldClientIP))
+}
+
+// WhereClientProfile applies the entql string predicate on the client_profile field.
+func (f *RequestFilter) WhereClientProfile(p entql.StringP) {
+	f.Where(p.Field(request.FieldClientProfile))
+}
+
+// WhereClientDetectSource applies the entql string predicate on the client_detect_source field.
+func (f *RequestFilter) WhereClientDetectSource(p entql.StringP) {
+	f.Where(p.Field(request.FieldClientDetectSource))
+}
+
+// WhereClientCompatApplied applies the entql bool predicate on the client_compat_applied field.
+func (f *RequestFilter) WhereClientCompatApplied(p entql.BoolP) {
+	f.Where(p.Field(request.FieldClientCompatApplied))
 }
 
 // WhereMetricsLatencyMs applies the entql int64 predicate on the metrics_latency_ms field.

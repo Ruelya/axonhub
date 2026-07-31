@@ -56,6 +56,12 @@ const (
 	FieldStream = "stream"
 	// FieldClientIP holds the string denoting the client_ip field in the database.
 	FieldClientIP = "client_ip"
+	// FieldClientProfile holds the string denoting the client_profile field in the database.
+	FieldClientProfile = "client_profile"
+	// FieldClientDetectSource holds the string denoting the client_detect_source field in the database.
+	FieldClientDetectSource = "client_detect_source"
+	// FieldClientCompatApplied holds the string denoting the client_compat_applied field in the database.
+	FieldClientCompatApplied = "client_compat_applied"
 	// FieldMetricsLatencyMs holds the string denoting the metrics_latency_ms field in the database.
 	FieldMetricsLatencyMs = "metrics_latency_ms"
 	// FieldMetricsFirstTokenLatencyMs holds the string denoting the metrics_first_token_latency_ms field in the database.
@@ -159,6 +165,9 @@ var Columns = []string{
 	FieldStatus,
 	FieldStream,
 	FieldClientIP,
+	FieldClientProfile,
+	FieldClientDetectSource,
+	FieldClientCompatApplied,
 	FieldMetricsLatencyMs,
 	FieldMetricsFirstTokenLatencyMs,
 	FieldMetricsReasoningDurationMs,
@@ -202,6 +211,12 @@ var (
 	DefaultStream bool
 	// DefaultClientIP holds the default value on creation for the "client_ip" field.
 	DefaultClientIP string
+	// DefaultClientProfile holds the default value on creation for the "client_profile" field.
+	DefaultClientProfile string
+	// DefaultClientDetectSource holds the default value on creation for the "client_detect_source" field.
+	DefaultClientDetectSource string
+	// DefaultClientCompatApplied holds the default value on creation for the "client_compat_applied" field.
+	DefaultClientCompatApplied bool
 	// DefaultContentSaved holds the default value on creation for the "content_saved" field.
 	DefaultContentSaved bool
 )
@@ -340,6 +355,21 @@ func ByStream(opts ...sql.OrderTermOption) OrderOption {
 // ByClientIP orders the results by the client_ip field.
 func ByClientIP(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldClientIP, opts...).ToFunc()
+}
+
+// ByClientProfile orders the results by the client_profile field.
+func ByClientProfile(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldClientProfile, opts...).ToFunc()
+}
+
+// ByClientDetectSource orders the results by the client_detect_source field.
+func ByClientDetectSource(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldClientDetectSource, opts...).ToFunc()
+}
+
+// ByClientCompatApplied orders the results by the client_compat_applied field.
+func ByClientCompatApplied(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldClientCompatApplied, opts...).ToFunc()
 }
 
 // ByMetricsLatencyMs orders the results by the metrics_latency_ms field.

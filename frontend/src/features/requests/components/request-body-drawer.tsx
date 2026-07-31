@@ -28,8 +28,10 @@ import { useRequestPermissions } from '../../../hooks/useRequestPermissions';
 import { useRequest, fetchAdjacentRequestPage } from '../data';
 import { Request, RequestConnection } from '../data/schema';
 import { CurlPreviewDialog } from './curl-preview-dialog';
+import { ResponseCompatDiff } from './response-compat-diff';
 import { getStatusColor } from './help';
 import { generateRequestCurl } from '../utils/curl-generator';
+import { resolveCompatDisplay } from '../utils/client-compat';
 
 interface RequestBodyDrawerProps {
   open: boolean;
@@ -380,25 +382,40 @@ export function RequestBodyDrawer({
                   </ScrollArea>
                 </TabsContent>
 
-                <TabsContent value='response' className='m-0 min-h-0 flex-1 px-6 pb-6 pt-4'>
-                  <ScrollArea className='bg-muted/20 h-full w-full rounded-lg border p-4'>
-                    {displayedRequest.responseBody ? (
-                      <JsonViewer
-                        key={`res-${currentRequestId}`}
-                        data={displayedRequest.responseBody}
-                        rootName=''
-                        defaultExpanded={true}
-                        expandDepth='all'
-                        hideArrayIndices={true}
-                        globalStringExpanded={globalExpanded}
-                        className='text-sm'
-                      />
-                    ) : (
-                      <div className='flex h-32 items-center justify-center'>
-                        <p className='text-muted-foreground text-sm'>{t('requests.detail.noResponse')}</p>
-                      </div>
-                    )}
-                  </ScrollArea>
+                <TabsContent value='response' className='m-0 min-h-0 flex-1 space-y-3 overflow-auto px-6 pb-6 pt-4'>
+                  {(() => {
+                    const compat = resolveCompatDisplay(displayedRequest);
+                    const showCompatDiff = compat.applied && !!displayedRequest.responseBody;
+                    return (
+                      <>
+                        {showCompatDiff && (
+                          <ResponseCompatDiff
+                            responseBody={displayedRequest.responseBody}
+                            compat={compat}
+                            mode='unified'
+                          />
+                        )}
+                        <ScrollArea className='bg-muted/20 h-[min(50vh,420px)] w-full rounded-lg border p-4'>
+                          {displayedRequest.responseBody ? (
+                            <JsonViewer
+                              key={`res-${currentRequestId}`}
+                              data={displayedRequest.responseBody}
+                              rootName=''
+                              defaultExpanded={true}
+                              expandDepth='all'
+                              hideArrayIndices={true}
+                              globalStringExpanded={globalExpanded}
+                              className='text-sm'
+                            />
+                          ) : (
+                            <div className='flex h-32 items-center justify-center'>
+                              <p className='text-muted-foreground text-sm'>{t('requests.detail.noResponse')}</p>
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </>
+                    );
+                  })()}
                 </TabsContent>
               </Tabs>
             </div>

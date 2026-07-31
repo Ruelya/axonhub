@@ -61,6 +61,9 @@ function buildRequestsQuery(permissions: { canViewApiKeys: boolean; canViewChann
             stream
             status
             clientIP
+            clientProfile
+            clientDetectSource
+            clientCompatApplied
             metricsLatencyMs
             metricsFirstTokenLatencyMs
             metricsReasoningDurationMs
@@ -138,6 +141,9 @@ function buildRequestDetailQuery(permissions: { canViewApiKeys: boolean; canView
           modelID
           stream
           clientIP
+          clientProfile
+          clientDetectSource
+          clientCompatApplied
           projectID
           dataStorageID
           contentSaved
@@ -197,6 +203,9 @@ function buildRequestDetailPollingQuery(permissions: { canViewApiKeys: boolean; 
           modelID
           stream
           clientIP
+          clientProfile
+          clientDetectSource
+          clientCompatApplied
           projectID
           dataStorageID
           contentSaved

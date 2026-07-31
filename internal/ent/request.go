@@ -62,6 +62,12 @@ type Request struct {
 	Stream bool `json:"stream,omitempty"`
 	// ClientIP holds the value of the "client_ip" field.
 	ClientIP string `json:"client_ip,omitempty"`
+	// Detected client profile id from headers / User-Agent
+	ClientProfile string `json:"client_profile,omitempty"`
+	// How the client was identified: explicit, user_agent, or none
+	ClientDetectSource string `json:"client_detect_source,omitempty"`
+	// Whether AxonHub applied client-compat response patches on the wire
+	ClientCompatApplied bool `json:"client_compat_applied,omitempty"`
 	// MetricsLatencyMs holds the value of the "metrics_latency_ms" field.
 	MetricsLatencyMs *int64 `json:"metrics_latency_ms,omitempty"`
 	// MetricsFirstTokenLatencyMs holds the value of the "metrics_first_token_latency_ms" field.
@@ -188,11 +194,11 @@ func (*Request) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case request.FieldRequestHeaders, request.FieldRequestBody, request.FieldResponseBody, request.FieldResponseChunks:
 			values[i] = new([]byte)
-		case request.FieldStream, request.FieldContentSaved:
+		case request.FieldStream, request.FieldClientCompatApplied, request.FieldContentSaved:
 			values[i] = new(sql.NullBool)
 		case request.FieldID, request.FieldAPIKeyID, request.FieldProjectID, request.FieldTraceID, request.FieldDataStorageID, request.FieldChannelID, request.FieldMetricsLatencyMs, request.FieldMetricsFirstTokenLatencyMs, request.FieldMetricsReasoningDurationMs, request.FieldContentStorageID:
 			values[i] = new(sql.NullInt64)
-		case request.FieldSource, request.FieldModelID, request.FieldReasoningEffort, request.FieldFormat, request.FieldExternalID, request.FieldStatus, request.FieldClientIP, request.FieldContentStorageKey:
+		case request.FieldSource, request.FieldModelID, request.FieldReasoningEffort, request.FieldFormat, request.FieldExternalID, request.FieldStatus, request.FieldClientIP, request.FieldClientProfile, request.FieldClientDetectSource, request.FieldContentStorageKey:
 			values[i] = new(sql.NullString)
 		case request.FieldCreatedAt, request.FieldUpdatedAt, request.FieldContentSavedAt:
 			values[i] = new(sql.NullTime)
@@ -338,6 +344,24 @@ func (_m *Request) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field client_ip", values[i])
 			} else if value.Valid {
 				_m.ClientIP = value.String
+			}
+		case request.FieldClientProfile:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field client_profile", values[i])
+			} else if value.Valid {
+				_m.ClientProfile = value.String
+			}
+		case request.FieldClientDetectSource:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field client_detect_source", values[i])
+			} else if value.Valid {
+				_m.ClientDetectSource = value.String
+			}
+		case request.FieldClientCompatApplied:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field client_compat_applied", values[i])
+			} else if value.Valid {
+				_m.ClientCompatApplied = value.Bool
 			}
 		case request.FieldMetricsLatencyMs:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -514,6 +538,15 @@ func (_m *Request) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("client_ip=")
 	builder.WriteString(_m.ClientIP)
+	builder.WriteString(", ")
+	builder.WriteString("client_profile=")
+	builder.WriteString(_m.ClientProfile)
+	builder.WriteString(", ")
+	builder.WriteString("client_detect_source=")
+	builder.WriteString(_m.ClientDetectSource)
+	builder.WriteString(", ")
+	builder.WriteString("client_compat_applied=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ClientCompatApplied))
 	builder.WriteString(", ")
 	if v := _m.MetricsLatencyMs; v != nil {
 		builder.WriteString("metrics_latency_ms=")

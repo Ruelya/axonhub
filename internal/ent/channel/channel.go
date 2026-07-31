@@ -228,10 +228,8 @@ const (
 	TypeXiaomi              Type = "xiaomi"
 	TypeXiaomiAnthropic     Type = "xiaomi_anthropic"
 	TypeXai                 Type = "xai"
-	// TypeXaiResponses is xAI's OpenAI-compatible Responses endpoint, with
-	// Codex freeform→function tool bridging for apply_patch.
-	TypeXaiResponses Type = "xai_responses"
-	TypePpio         Type = "ppio"
+	TypeXaiResponses        Type = "xai_responses"
+	TypePpio                Type = "ppio"
 	TypeSiliconflow         Type = "siliconflow"
 	TypeVolcengine          Type = "volcengine"
 	TypeVolcengineAnthropic Type = "volcengine_anthropic"

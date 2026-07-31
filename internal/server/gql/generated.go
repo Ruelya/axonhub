@@ -1483,7 +1483,10 @@ type ComplexityRoot struct {
 		APIKeyID                   func(childComplexity int) int
 		Channel                    func(childComplexity int) int
 		ChannelID                  func(childComplexity int) int
+		ClientCompatApplied        func(childComplexity int) int
+		ClientDetectSource         func(childComplexity int) int
 		ClientIP                   func(childComplexity int) int
+		ClientProfile              func(childComplexity int) int
 		ContentSaved               func(childComplexity int) int
 		ContentSavedAt             func(childComplexity int) int
 		ContentStorageID           func(childComplexity int) int
@@ -8973,12 +8976,30 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Request.ChannelID(childComplexity), true
+	case "Request.clientCompatApplied":
+		if e.complexity.Request.ClientCompatApplied == nil {
+			break
+		}
+
+		return e.complexity.Request.ClientCompatApplied(childComplexity), true
+	case "Request.clientDetectSource":
+		if e.complexity.Request.ClientDetectSource == nil {
+			break
+		}
+
+		return e.complexity.Request.ClientDetectSource(childComplexity), true
 	case "Request.clientIP":
 		if e.complexity.Request.ClientIP == nil {
 			break
 		}
 
 		return e.complexity.Request.ClientIP(childComplexity), true
+	case "Request.clientProfile":
+		if e.complexity.Request.ClientProfile == nil {
+			break
+		}
+
+		return e.complexity.Request.ClientProfile(childComplexity), true
 	case "Request.contentSaved":
 		if e.complexity.Request.ContentSaved == nil {
 			break
@@ -48668,6 +48689,93 @@ func (ec *executionContext) fieldContext_Request_clientIP(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Request_clientProfile(ctx context.Context, field graphql.CollectedField, obj *ent.Request) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Request_clientProfile,
+		func(ctx context.Context) (any, error) {
+			return obj.ClientProfile, nil
+		},
+		nil,
+		ec.marshalOString2string,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Request_clientProfile(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Request",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Request_clientDetectSource(ctx context.Context, field graphql.CollectedField, obj *ent.Request) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Request_clientDetectSource,
+		func(ctx context.Context) (any, error) {
+			return obj.ClientDetectSource, nil
+		},
+		nil,
+		ec.marshalOString2string,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Request_clientDetectSource(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Request",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Request_clientCompatApplied(ctx context.Context, field graphql.CollectedField, obj *ent.Request) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Request_clientCompatApplied,
+		func(ctx context.Context) (any, error) {
+			return obj.ClientCompatApplied, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Request_clientCompatApplied(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Request",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Request_metricsLatencyMs(ctx context.Context, field graphql.CollectedField, obj *ent.Request) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -49467,6 +49575,12 @@ func (ec *executionContext) fieldContext_RequestEdge_node(_ context.Context, fie
 				return ec.fieldContext_Request_stream(ctx, field)
 			case "clientIP":
 				return ec.fieldContext_Request_clientIP(ctx, field)
+			case "clientProfile":
+				return ec.fieldContext_Request_clientProfile(ctx, field)
+			case "clientDetectSource":
+				return ec.fieldContext_Request_clientDetectSource(ctx, field)
+			case "clientCompatApplied":
+				return ec.fieldContext_Request_clientCompatApplied(ctx, field)
 			case "metricsLatencyMs":
 				return ec.fieldContext_Request_metricsLatencyMs(ctx, field)
 			case "metricsFirstTokenLatencyMs":
@@ -50262,6 +50376,12 @@ func (ec *executionContext) fieldContext_RequestExecution_request(_ context.Cont
 				return ec.fieldContext_Request_stream(ctx, field)
 			case "clientIP":
 				return ec.fieldContext_Request_clientIP(ctx, field)
+			case "clientProfile":
+				return ec.fieldContext_Request_clientProfile(ctx, field)
+			case "clientDetectSource":
+				return ec.fieldContext_Request_clientDetectSource(ctx, field)
+			case "clientCompatApplied":
+				return ec.fieldContext_Request_clientCompatApplied(ctx, field)
 			case "metricsLatencyMs":
 				return ec.fieldContext_Request_metricsLatencyMs(ctx, field)
 			case "metricsFirstTokenLatencyMs":
@@ -58871,6 +58991,12 @@ func (ec *executionContext) fieldContext_UsageLog_request(_ context.Context, fie
 				return ec.fieldContext_Request_stream(ctx, field)
 			case "clientIP":
 				return ec.fieldContext_Request_clientIP(ctx, field)
+			case "clientProfile":
+				return ec.fieldContext_Request_clientProfile(ctx, field)
+			case "clientDetectSource":
+				return ec.fieldContext_Request_clientDetectSource(ctx, field)
+			case "clientCompatApplied":
+				return ec.fieldContext_Request_clientCompatApplied(ctx, field)
 			case "metricsLatencyMs":
 				return ec.fieldContext_Request_metricsLatencyMs(ctx, field)
 			case "metricsFirstTokenLatencyMs":
@@ -70626,7 +70752,7 @@ func (ec *executionContext) unmarshalInputCreateRequestInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"source", "modelID", "reasoningEffort", "format", "requestHeaders", "requestBody", "responseBody", "responseChunks", "externalID", "status", "stream", "clientIP", "metricsLatencyMs", "metricsFirstTokenLatencyMs", "metricsReasoningDurationMs", "contentSaved", "contentStorageID", "contentStorageKey", "contentSavedAt", "apiKeyID", "projectID", "traceID", "dataStorageID", "channelID"}
+	fieldsInOrder := [...]string{"source", "modelID", "reasoningEffort", "format", "requestHeaders", "requestBody", "responseBody", "responseChunks", "externalID", "status", "stream", "clientIP", "clientProfile", "clientDetectSource", "clientCompatApplied", "metricsLatencyMs", "metricsFirstTokenLatencyMs", "metricsReasoningDurationMs", "contentSaved", "contentStorageID", "contentStorageKey", "contentSavedAt", "apiKeyID", "projectID", "traceID", "dataStorageID", "channelID"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -70717,6 +70843,27 @@ func (ec *executionContext) unmarshalInputCreateRequestInput(ctx context.Context
 				return it, err
 			}
 			it.ClientIP = data
+		case "clientProfile":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfile"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfile = data
+		case "clientDetectSource":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSource"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSource = data
+		case "clientCompatApplied":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientCompatApplied"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientCompatApplied = data
 		case "metricsLatencyMs":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("metricsLatencyMs"))
 			data, err := ec.unmarshalOInt2ᚖint64(ctx, v)
@@ -79657,7 +79804,7 @@ func (ec *executionContext) unmarshalInputRequestWhereInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"not", "and", "or", "id", "idNEQ", "idIn", "idNotIn", "idGT", "idGTE", "idLT", "idLTE", "createdAt", "createdAtNEQ", "createdAtIn", "createdAtNotIn", "createdAtGT", "createdAtGTE", "createdAtLT", "createdAtLTE", "updatedAt", "updatedAtNEQ", "updatedAtIn", "updatedAtNotIn", "updatedAtGT", "updatedAtGTE", "updatedAtLT", "updatedAtLTE", "apiKeyID", "apiKeyIDNEQ", "apiKeyIDIn", "apiKeyIDNotIn", "apiKeyIDIsNil", "apiKeyIDNotNil", "projectID", "projectIDNEQ", "projectIDIn", "projectIDNotIn", "traceID", "traceIDNEQ", "traceIDIn", "traceIDNotIn", "traceIDIsNil", "traceIDNotNil", "dataStorageID", "dataStorageIDNEQ", "dataStorageIDIn", "dataStorageIDNotIn", "dataStorageIDIsNil", "dataStorageIDNotNil", "source", "sourceNEQ", "sourceIn", "sourceNotIn", "modelID", "modelIDNEQ", "modelIDIn", "modelIDNotIn", "modelIDGT", "modelIDGTE", "modelIDLT", "modelIDLTE", "modelIDContains", "modelIDHasPrefix", "modelIDHasSuffix", "modelIDEqualFold", "modelIDContainsFold", "reasoningEffort", "reasoningEffortNEQ", "reasoningEffortIn", "reasoningEffortNotIn", "reasoningEffortGT", "reasoningEffortGTE", "reasoningEffortLT", "reasoningEffortLTE", "reasoningEffortContains", "reasoningEffortHasPrefix", "reasoningEffortHasSuffix", "reasoningEffortIsNil", "reasoningEffortNotNil", "reasoningEffortEqualFold", "reasoningEffortContainsFold", "format", "formatNEQ", "formatIn", "formatNotIn", "formatGT", "formatGTE", "formatLT", "formatLTE", "formatContains", "formatHasPrefix", "formatHasSuffix", "formatEqualFold", "formatContainsFold", "channelID", "channelIDNEQ", "channelIDIn", "channelIDNotIn", "channelIDIsNil", "channelIDNotNil", "externalID", "externalIDNEQ", "externalIDIn", "externalIDNotIn", "externalIDGT", "externalIDGTE", "externalIDLT", "externalIDLTE", "externalIDContains", "externalIDHasPrefix", "externalIDHasSuffix", "externalIDIsNil", "externalIDNotNil", "externalIDEqualFold", "externalIDContainsFold", "status", "statusNEQ", "statusIn", "statusNotIn", "stream", "streamNEQ", "clientIP", "clientIPNEQ", "clientIPIn", "clientIPNotIn", "clientIPGT", "clientIPGTE", "clientIPLT", "clientIPLTE", "clientIPContains", "clientIPHasPrefix", "clientIPHasSuffix", "clientIPEqualFold", "clientIPContainsFold", "metricsLatencyMs", "metricsLatencyMsNEQ", "metricsLatencyMsIn", "metricsLatencyMsNotIn", "metricsLatencyMsGT", "metricsLatencyMsGTE", "metricsLatencyMsLT", "metricsLatencyMsLTE", "metricsLatencyMsIsNil", "metricsLatencyMsNotNil", "metricsFirstTokenLatencyMs", "metricsFirstTokenLatencyMsNEQ", "metricsFirstTokenLatencyMsIn", "metricsFirstTokenLatencyMsNotIn", "metricsFirstTokenLatencyMsGT", "metricsFirstTokenLatencyMsGTE", "metricsFirstTokenLatencyMsLT", "metricsFirstTokenLatencyMsLTE", "metricsFirstTokenLatencyMsIsNil", "metricsFirstTokenLatencyMsNotNil", "metricsReasoningDurationMs", "metricsReasoningDurationMsNEQ", "metricsReasoningDurationMsIn", "metricsReasoningDurationMsNotIn", "metricsReasoningDurationMsGT", "metricsReasoningDurationMsGTE", "metricsReasoningDurationMsLT", "metricsReasoningDurationMsLTE", "metricsReasoningDurationMsIsNil", "metricsReasoningDurationMsNotNil", "contentSaved", "contentSavedNEQ", "contentStorageID", "contentStorageIDNEQ", "contentStorageIDIn", "contentStorageIDNotIn", "contentStorageIDGT", "contentStorageIDGTE", "contentStorageIDLT", "contentStorageIDLTE", "contentStorageIDIsNil", "contentStorageIDNotNil", "contentStorageKey", "contentStorageKeyNEQ", "contentStorageKeyIn", "contentStorageKeyNotIn", "contentStorageKeyGT", "contentStorageKeyGTE", "contentStorageKeyLT", "contentStorageKeyLTE", "contentStorageKeyContains", "contentStorageKeyHasPrefix", "contentStorageKeyHasSuffix", "contentStorageKeyIsNil", "contentStorageKeyNotNil", "contentStorageKeyEqualFold", "contentStorageKeyContainsFold", "contentSavedAt", "contentSavedAtNEQ", "contentSavedAtIn", "contentSavedAtNotIn", "contentSavedAtGT", "contentSavedAtGTE", "contentSavedAtLT", "contentSavedAtLTE", "contentSavedAtIsNil", "contentSavedAtNotNil", "hasAPIKey", "hasAPIKeyWith", "hasProject", "hasProjectWith", "hasTrace", "hasTraceWith", "hasDataStorage", "hasDataStorageWith", "hasExecutions", "hasExecutionsWith", "hasChannel", "hasChannelWith", "hasUsageLogs", "hasUsageLogsWith"}
+	fieldsInOrder := [...]string{"not", "and", "or", "id", "idNEQ", "idIn", "idNotIn", "idGT", "idGTE", "idLT", "idLTE", "createdAt", "createdAtNEQ", "createdAtIn", "createdAtNotIn", "createdAtGT", "createdAtGTE", "createdAtLT", "createdAtLTE", "updatedAt", "updatedAtNEQ", "updatedAtIn", "updatedAtNotIn", "updatedAtGT", "updatedAtGTE", "updatedAtLT", "updatedAtLTE", "apiKeyID", "apiKeyIDNEQ", "apiKeyIDIn", "apiKeyIDNotIn", "apiKeyIDIsNil", "apiKeyIDNotNil", "projectID", "projectIDNEQ", "projectIDIn", "projectIDNotIn", "traceID", "traceIDNEQ", "traceIDIn", "traceIDNotIn", "traceIDIsNil", "traceIDNotNil", "dataStorageID", "dataStorageIDNEQ", "dataStorageIDIn", "dataStorageIDNotIn", "dataStorageIDIsNil", "dataStorageIDNotNil", "source", "sourceNEQ", "sourceIn", "sourceNotIn", "modelID", "modelIDNEQ", "modelIDIn", "modelIDNotIn", "modelIDGT", "modelIDGTE", "modelIDLT", "modelIDLTE", "modelIDContains", "modelIDHasPrefix", "modelIDHasSuffix", "modelIDEqualFold", "modelIDContainsFold", "reasoningEffort", "reasoningEffortNEQ", "reasoningEffortIn", "reasoningEffortNotIn", "reasoningEffortGT", "reasoningEffortGTE", "reasoningEffortLT", "reasoningEffortLTE", "reasoningEffortContains", "reasoningEffortHasPrefix", "reasoningEffortHasSuffix", "reasoningEffortIsNil", "reasoningEffortNotNil", "reasoningEffortEqualFold", "reasoningEffortContainsFold", "format", "formatNEQ", "formatIn", "formatNotIn", "formatGT", "formatGTE", "formatLT", "formatLTE", "formatContains", "formatHasPrefix", "formatHasSuffix", "formatEqualFold", "formatContainsFold", "channelID", "channelIDNEQ", "channelIDIn", "channelIDNotIn", "channelIDIsNil", "channelIDNotNil", "externalID", "externalIDNEQ", "externalIDIn", "externalIDNotIn", "externalIDGT", "externalIDGTE", "externalIDLT", "externalIDLTE", "externalIDContains", "externalIDHasPrefix", "externalIDHasSuffix", "externalIDIsNil", "externalIDNotNil", "externalIDEqualFold", "externalIDContainsFold", "status", "statusNEQ", "statusIn", "statusNotIn", "stream", "streamNEQ", "clientIP", "clientIPNEQ", "clientIPIn", "clientIPNotIn", "clientIPGT", "clientIPGTE", "clientIPLT", "clientIPLTE", "clientIPContains", "clientIPHasPrefix", "clientIPHasSuffix", "clientIPEqualFold", "clientIPContainsFold", "clientProfile", "clientProfileNEQ", "clientProfileIn", "clientProfileNotIn", "clientProfileGT", "clientProfileGTE", "clientProfileLT", "clientProfileLTE", "clientProfileContains", "clientProfileHasPrefix", "clientProfileHasSuffix", "clientProfileIsNil", "clientProfileNotNil", "clientProfileEqualFold", "clientProfileContainsFold", "clientDetectSource", "clientDetectSourceNEQ", "clientDetectSourceIn", "clientDetectSourceNotIn", "clientDetectSourceGT", "clientDetectSourceGTE", "clientDetectSourceLT", "clientDetectSourceLTE", "clientDetectSourceContains", "clientDetectSourceHasPrefix", "clientDetectSourceHasSuffix", "clientDetectSourceIsNil", "clientDetectSourceNotNil", "clientDetectSourceEqualFold", "clientDetectSourceContainsFold", "clientCompatApplied", "clientCompatAppliedNEQ", "metricsLatencyMs", "metricsLatencyMsNEQ", "metricsLatencyMsIn", "metricsLatencyMsNotIn", "metricsLatencyMsGT", "metricsLatencyMsGTE", "metricsLatencyMsLT", "metricsLatencyMsLTE", "metricsLatencyMsIsNil", "metricsLatencyMsNotNil", "metricsFirstTokenLatencyMs", "metricsFirstTokenLatencyMsNEQ", "metricsFirstTokenLatencyMsIn", "metricsFirstTokenLatencyMsNotIn", "metricsFirstTokenLatencyMsGT", "metricsFirstTokenLatencyMsGTE", "metricsFirstTokenLatencyMsLT", "metricsFirstTokenLatencyMsLTE", "metricsFirstTokenLatencyMsIsNil", "metricsFirstTokenLatencyMsNotNil", "metricsReasoningDurationMs", "metricsReasoningDurationMsNEQ", "metricsReasoningDurationMsIn", "metricsReasoningDurationMsNotIn", "metricsReasoningDurationMsGT", "metricsReasoningDurationMsGTE", "metricsReasoningDurationMsLT", "metricsReasoningDurationMsLTE", "metricsReasoningDurationMsIsNil", "metricsReasoningDurationMsNotNil", "contentSaved", "contentSavedNEQ", "contentStorageID", "contentStorageIDNEQ", "contentStorageIDIn", "contentStorageIDNotIn", "contentStorageIDGT", "contentStorageIDGTE", "contentStorageIDLT", "contentStorageIDLTE", "contentStorageIDIsNil", "contentStorageIDNotNil", "contentStorageKey", "contentStorageKeyNEQ", "contentStorageKeyIn", "contentStorageKeyNotIn", "contentStorageKeyGT", "contentStorageKeyGTE", "contentStorageKeyLT", "contentStorageKeyLTE", "contentStorageKeyContains", "contentStorageKeyHasPrefix", "contentStorageKeyHasSuffix", "contentStorageKeyIsNil", "contentStorageKeyNotNil", "contentStorageKeyEqualFold", "contentStorageKeyContainsFold", "contentSavedAt", "contentSavedAtNEQ", "contentSavedAtIn", "contentSavedAtNotIn", "contentSavedAtGT", "contentSavedAtGTE", "contentSavedAtLT", "contentSavedAtLTE", "contentSavedAtIsNil", "contentSavedAtNotNil", "hasAPIKey", "hasAPIKeyWith", "hasProject", "hasProjectWith", "hasTrace", "hasTraceWith", "hasDataStorage", "hasDataStorageWith", "hasExecutions", "hasExecutionsWith", "hasChannel", "hasChannelWith", "hasUsageLogs", "hasUsageLogsWith"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -80714,6 +80861,230 @@ func (ec *executionContext) unmarshalInputRequestWhereInput(ctx context.Context,
 				return it, err
 			}
 			it.ClientIPContainsFold = data
+		case "clientProfile":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfile"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfile = data
+		case "clientProfileNEQ":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileNEQ"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileNEQ = data
+		case "clientProfileIn":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileIn"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileIn = data
+		case "clientProfileNotIn":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileNotIn"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileNotIn = data
+		case "clientProfileGT":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileGT"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileGT = data
+		case "clientProfileGTE":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileGTE"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileGTE = data
+		case "clientProfileLT":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileLT"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileLT = data
+		case "clientProfileLTE":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileLTE"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileLTE = data
+		case "clientProfileContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileContains = data
+		case "clientProfileHasPrefix":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileHasPrefix"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileHasPrefix = data
+		case "clientProfileHasSuffix":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileHasSuffix"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileHasSuffix = data
+		case "clientProfileIsNil":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileIsNil"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileIsNil = data
+		case "clientProfileNotNil":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileNotNil"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileNotNil = data
+		case "clientProfileEqualFold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileEqualFold"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileEqualFold = data
+		case "clientProfileContainsFold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfileContainsFold"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfileContainsFold = data
+		case "clientDetectSource":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSource"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSource = data
+		case "clientDetectSourceNEQ":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceNEQ"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceNEQ = data
+		case "clientDetectSourceIn":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceIn"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceIn = data
+		case "clientDetectSourceNotIn":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceNotIn"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceNotIn = data
+		case "clientDetectSourceGT":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceGT"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceGT = data
+		case "clientDetectSourceGTE":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceGTE"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceGTE = data
+		case "clientDetectSourceLT":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceLT"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceLT = data
+		case "clientDetectSourceLTE":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceLTE"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceLTE = data
+		case "clientDetectSourceContains":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceContains"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceContains = data
+		case "clientDetectSourceHasPrefix":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceHasPrefix"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceHasPrefix = data
+		case "clientDetectSourceHasSuffix":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceHasSuffix"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceHasSuffix = data
+		case "clientDetectSourceIsNil":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceIsNil"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceIsNil = data
+		case "clientDetectSourceNotNil":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceNotNil"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceNotNil = data
+		case "clientDetectSourceEqualFold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceEqualFold"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceEqualFold = data
+		case "clientDetectSourceContainsFold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSourceContainsFold"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSourceContainsFold = data
+		case "clientCompatApplied":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientCompatApplied"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientCompatApplied = data
+		case "clientCompatAppliedNEQ":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientCompatAppliedNEQ"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientCompatAppliedNEQ = data
 		case "metricsLatencyMs":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("metricsLatencyMs"))
 			data, err := ec.unmarshalOInt2ᚖint64(ctx, v)
@@ -85317,7 +85688,7 @@ func (ec *executionContext) unmarshalInputUpdateRequestInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"requestHeaders", "appendRequestHeaders", "clearRequestHeaders", "responseBody", "appendResponseBody", "clearResponseBody", "responseChunks", "appendResponseChunks", "clearResponseChunks", "externalID", "clearExternalID", "status", "metricsLatencyMs", "clearMetricsLatencyMs", "metricsFirstTokenLatencyMs", "clearMetricsFirstTokenLatencyMs", "metricsReasoningDurationMs", "clearMetricsReasoningDurationMs", "contentSaved", "contentStorageID", "clearContentStorageID", "contentStorageKey", "clearContentStorageKey", "contentSavedAt", "clearContentSavedAt", "channelID", "clearChannel"}
+	fieldsInOrder := [...]string{"requestHeaders", "appendRequestHeaders", "clearRequestHeaders", "responseBody", "appendResponseBody", "clearResponseBody", "responseChunks", "appendResponseChunks", "clearResponseChunks", "externalID", "clearExternalID", "status", "clientProfile", "clearClientProfile", "clientDetectSource", "clearClientDetectSource", "clientCompatApplied", "metricsLatencyMs", "clearMetricsLatencyMs", "metricsFirstTokenLatencyMs", "clearMetricsFirstTokenLatencyMs", "metricsReasoningDurationMs", "clearMetricsReasoningDurationMs", "contentSaved", "contentStorageID", "clearContentStorageID", "contentStorageKey", "clearContentStorageKey", "contentSavedAt", "clearContentSavedAt", "channelID", "clearChannel"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -85408,6 +85779,41 @@ func (ec *executionContext) unmarshalInputUpdateRequestInput(ctx context.Context
 				return it, err
 			}
 			it.Status = data
+		case "clientProfile":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientProfile"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientProfile = data
+		case "clearClientProfile":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clearClientProfile"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClearClientProfile = data
+		case "clientDetectSource":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientDetectSource"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientDetectSource = data
+		case "clearClientDetectSource":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clearClientDetectSource"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClearClientDetectSource = data
+		case "clientCompatApplied":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("clientCompatApplied"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ClientCompatApplied = data
 		case "metricsLatencyMs":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("metricsLatencyMs"))
 			data, err := ec.unmarshalOInt2ᚖint64(ctx, v)
@@ -103491,6 +103897,15 @@ func (ec *executionContext) _Request(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "clientIP":
 			out.Values[i] = ec._Request_clientIP(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "clientProfile":
+			out.Values[i] = ec._Request_clientProfile(ctx, field, obj)
+		case "clientDetectSource":
+			out.Values[i] = ec._Request_clientDetectSource(ctx, field, obj)
+		case "clientCompatApplied":
+			out.Values[i] = ec._Request_clientCompatApplied(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

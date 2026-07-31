@@ -18,6 +18,7 @@ import { useGeneralSettings, useSecuritySettings, useUpdateSecuritySettings } fr
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRequestPermissions } from '../../../hooks/useRequestPermissions';
 import { Request } from '../data/schema';
+import { resolveCompatDisplay } from '../utils/client-compat';
 import { calculateTokensPerSecond, useDisplayMode } from '../utils/tokens-per-second';
 import { getStatusColor } from './help';
 
@@ -240,6 +241,40 @@ export function useRequestsColumns(options?: UseRequestsColumnsOptions): ColumnD
       },
       filterFn: (row, id, value) => {
         return value.includes(row.getValue(id));
+      },
+    },
+    {
+      id: 'clientProfile',
+      accessorKey: 'clientProfile',
+      header: ({ column }) => <DataTableColumnHeader column={column} title={t('requests.columns.client')} />,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const compat = resolveCompatDisplay(row.original);
+        const label =
+          compat.profileId === 'unknown' || !compat.profileId
+            ? t('requests.client.unknown')
+            : compat.displayName;
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant='secondary'
+                className={
+                  compat.applied
+                    ? 'cursor-default border-red-200 bg-red-50 font-medium text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300'
+                    : 'cursor-default border-emerald-200 bg-emerald-50 font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                }
+              >
+                {label}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              {compat.applied
+                ? t('requests.client.compat.appliedTooltip')
+                : t('requests.client.compat.normalTooltip')}
+            </TooltipContent>
+          </Tooltip>
+        );
       },
     },
     {

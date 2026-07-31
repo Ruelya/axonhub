@@ -3817,6 +3817,21 @@ func (_q *RequestQuery) collectField(ctx context.Context, oneNode bool, opCtx *g
 				selectedFields = append(selectedFields, request.FieldClientIP)
 				fieldSeen[request.FieldClientIP] = struct{}{}
 			}
+		case "clientProfile":
+			if _, ok := fieldSeen[request.FieldClientProfile]; !ok {
+				selectedFields = append(selectedFields, request.FieldClientProfile)
+				fieldSeen[request.FieldClientProfile] = struct{}{}
+			}
+		case "clientDetectSource":
+			if _, ok := fieldSeen[request.FieldClientDetectSource]; !ok {
+				selectedFields = append(selectedFields, request.FieldClientDetectSource)
+				fieldSeen[request.FieldClientDetectSource] = struct{}{}
+			}
+		case "clientCompatApplied":
+			if _, ok := fieldSeen[request.FieldClientCompatApplied]; !ok {
+				selectedFields = append(selectedFields, request.FieldClientCompatApplied)
+				fieldSeen[request.FieldClientCompatApplied] = struct{}{}
+			}
 		case "metricsLatencyMs":
 			if _, ok := fieldSeen[request.FieldMetricsLatencyMs]; !ok {
 				selectedFields = append(selectedFields, request.FieldMetricsLatencyMs)

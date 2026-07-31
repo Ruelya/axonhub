@@ -3,7 +3,10 @@ import { format } from 'date-fns';
 import { DashboardIcon } from '@radix-ui/react-icons';
 import { zhCN, enUS } from 'date-fns/locale';
 import { Copy, Clock, Key, Database, FileText, Layers, Download, Terminal, MonitorSmartphone } from 'lucide-react';
-import { clientSourceLabel, detectClientFromHeaders } from '@/features/system/data/client-detect';
+import { clientSourceLabel } from '@/features/system/data/client-detect';
+import { resolveCompatDisplay } from '../utils/client-compat';
+import { ResponseCompatDiff } from './response-compat-diff';
+import { SchemaComparePanel } from './schema-compare-panel';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { extractNumberID } from '@/lib/utils';
@@ -83,7 +86,16 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
   const hasResponseBody = !!(request?.responseBody && Object.keys(request.responseBody).length > 0);
   const hasResponseChunks = !!(request?.responseChunks && request.responseChunks.length > 0);
 
-  const clientDetect = useMemo(() => detectClientFromHeaders(request?.requestHeaders), [request?.requestHeaders]);
+  const clientCompat = useMemo(
+    () =>
+      resolveCompatDisplay({
+        clientProfile: request?.clientProfile,
+        clientDetectSource: request?.clientDetectSource,
+        clientCompatApplied: request?.clientCompatApplied,
+        requestHeaders: request?.requestHeaders,
+      }),
+    [request?.clientProfile, request?.clientDetectSource, request?.clientCompatApplied, request?.requestHeaders]
+  );
 
   const extractResponseText = useCallback(() => {
     if (!request) return '';
@@ -386,16 +398,25 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
               </div>
               <div className='flex flex-wrap items-center justify-end gap-1'>
                 <Badge
-                  variant={clientDetect.profileId === 'unknown' ? 'outline' : 'secondary'}
-                  className='font-mono text-[11px]'
+                  variant='secondary'
+                  className={
+                    clientCompat.applied
+                      ? 'border-red-200 bg-red-50 font-mono text-[11px] text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300'
+                      : 'border-emerald-200 bg-emerald-50 font-mono text-[11px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  }
                 >
-                  {clientDetect.displayName || t('requests.client.unknown')}
+                  {clientCompat.displayName || t('requests.client.unknown')}
                 </Badge>
-                {clientDetect.source !== 'none' && (
+                {clientCompat.applied && (
+                  <Badge variant='outline' className='border-red-200 text-[10px] text-red-600 dark:border-red-800 dark:text-red-300'>
+                    {t('requests.client.compat.applied')}
+                  </Badge>
+                )}
+                {clientCompat.source !== 'none' && (
                   <span className='text-muted-foreground text-[10px]'>
                     {t('requests.client.via', {
                       source:
-                        clientDetect.source === 'explicit'
+                        clientCompat.source === 'explicit'
                           ? clientSourceLabel('explicit')
                           : clientSourceLabel('user_agent'),
                     })}
@@ -589,6 +610,28 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
             </TabsContent>
 
             <TabsContent value='response' className='space-y-6 p-6'>
+              {hasResponseBody && (
+                <SchemaComparePanel
+                  responseBody={request.responseBody}
+                  compat={clientCompat}
+                  format={request.format}
+                />
+              )}
+
+              {clientCompat.applied && hasResponseBody && (
+                <div className='space-y-3'>
+                  <h4 className='flex items-center gap-2 text-base font-semibold'>
+                    <FileText className='text-primary h-4 w-4' />
+                    {t('requests.client.compat.responseDiffTitle')}
+                  </h4>
+                  <ResponseCompatDiff
+                    responseBody={request.responseBody}
+                    compat={clientCompat}
+                    mode='side-by-side'
+                  />
+                </div>
+              )}
+
               <Tabs value={responseView} onValueChange={(v: any) => setResponseView(v)} className='w-full'>
                 <div className='flex flex-wrap items-center justify-between gap-4'>
                   <TabsList className='grid w-full grid-cols-2 sm:w-[300px]'>
@@ -921,9 +964,17 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                                   </Button>
                                 </div>
                               </div>
-                              <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>
-                                <JsonViewer data={execution.responseBody} rootName='' defaultExpanded={false} hideArrayIndices={true} className='text-xs' />
-                              </div>
+                              {clientCompat.applied ? (
+                                <ResponseCompatDiff
+                                  responseBody={execution.responseBody}
+                                  compat={clientCompat}
+                                  mode='side-by-side'
+                                />
+                              ) : (
+                                <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>
+                                  <JsonViewer data={execution.responseBody} rootName='' defaultExpanded={false} hideArrayIndices={true} className='text-xs' />
+                                </div>
+                              )}
                             </div>
                           )}
                         </CardContent>

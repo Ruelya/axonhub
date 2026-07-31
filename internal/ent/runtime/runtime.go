@@ -670,8 +670,20 @@ func init() {
 	requestDescClientIP := requestFields[16].Descriptor()
 	// request.DefaultClientIP holds the default value on creation for the client_ip field.
 	request.DefaultClientIP = requestDescClientIP.Default.(string)
+	// requestDescClientProfile is the schema descriptor for client_profile field.
+	requestDescClientProfile := requestFields[17].Descriptor()
+	// request.DefaultClientProfile holds the default value on creation for the client_profile field.
+	request.DefaultClientProfile = requestDescClientProfile.Default.(string)
+	// requestDescClientDetectSource is the schema descriptor for client_detect_source field.
+	requestDescClientDetectSource := requestFields[18].Descriptor()
+	// request.DefaultClientDetectSource holds the default value on creation for the client_detect_source field.
+	request.DefaultClientDetectSource = requestDescClientDetectSource.Default.(string)
+	// requestDescClientCompatApplied is the schema descriptor for client_compat_applied field.
+	requestDescClientCompatApplied := requestFields[19].Descriptor()
+	// request.DefaultClientCompatApplied holds the default value on creation for the client_compat_applied field.
+	request.DefaultClientCompatApplied = requestDescClientCompatApplied.Default.(bool)
 	// requestDescContentSaved is the schema descriptor for content_saved field.
-	requestDescContentSaved := requestFields[20].Descriptor()
+	requestDescContentSaved := requestFields[23].Descriptor()
 	// request.DefaultContentSaved holds the default value on creation for the content_saved field.
 	request.DefaultContentSaved = requestDescContentSaved.Default.(bool)
 	requestexecutionMixin := schema.RequestExecution{}.Mixin()

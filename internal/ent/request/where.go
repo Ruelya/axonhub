@@ -120,6 +120,21 @@ func ClientIP(v string) predicate.Request {
 	return predicate.Request(sql.FieldEQ(FieldClientIP, v))
 }
 
+// ClientProfile applies equality check predicate on the "client_profile" field. It's identical to ClientProfileEQ.
+func ClientProfile(v string) predicate.Request {
+	return predicate.Request(sql.FieldEQ(FieldClientProfile, v))
+}
+
+// ClientDetectSource applies equality check predicate on the "client_detect_source" field. It's identical to ClientDetectSourceEQ.
+func ClientDetectSource(v string) predicate.Request {
+	return predicate.Request(sql.FieldEQ(FieldClientDetectSource, v))
+}
+
+// ClientCompatApplied applies equality check predicate on the "client_compat_applied" field. It's identical to ClientCompatAppliedEQ.
+func ClientCompatApplied(v bool) predicate.Request {
+	return predicate.Request(sql.FieldEQ(FieldClientCompatApplied, v))
+}
+
 // MetricsLatencyMs applies equality check predicate on the "metrics_latency_ms" field. It's identical to MetricsLatencyMsEQ.
 func MetricsLatencyMs(v int64) predicate.Request {
 	return predicate.Request(sql.FieldEQ(FieldMetricsLatencyMs, v))
@@ -798,6 +813,166 @@ func ClientIPEqualFold(v string) predicate.Request {
 // ClientIPContainsFold applies the ContainsFold predicate on the "client_ip" field.
 func ClientIPContainsFold(v string) predicate.Request {
 	return predicate.Request(sql.FieldContainsFold(FieldClientIP, v))
+}
+
+// ClientProfileEQ applies the EQ predicate on the "client_profile" field.
+func ClientProfileEQ(v string) predicate.Request {
+	return predicate.Request(sql.FieldEQ(FieldClientProfile, v))
+}
+
+// ClientProfileNEQ applies the NEQ predicate on the "client_profile" field.
+func ClientProfileNEQ(v string) predicate.Request {
+	return predicate.Request(sql.FieldNEQ(FieldClientProfile, v))
+}
+
+// ClientProfileIn applies the In predicate on the "client_profile" field.
+func ClientProfileIn(vs ...string) predicate.Request {
+	return predicate.Request(sql.FieldIn(FieldClientProfile, vs...))
+}
+
+// ClientProfileNotIn applies the NotIn predicate on the "client_profile" field.
+func ClientProfileNotIn(vs ...string) predicate.Request {
+	return predicate.Request(sql.FieldNotIn(FieldClientProfile, vs...))
+}
+
+// ClientProfileGT applies the GT predicate on the "client_profile" field.
+func ClientProfileGT(v string) predicate.Request {
+	return predicate.Request(sql.FieldGT(FieldClientProfile, v))
+}
+
+// ClientProfileGTE applies the GTE predicate on the "client_profile" field.
+func ClientProfileGTE(v string) predicate.Request {
+	return predicate.Request(sql.FieldGTE(FieldClientProfile, v))
+}
+
+// ClientProfileLT applies the LT predicate on the "client_profile" field.
+func ClientProfileLT(v string) predicate.Request {
+	return predicate.Request(sql.FieldLT(FieldClientProfile, v))
+}
+
+// ClientProfileLTE applies the LTE predicate on the "client_profile" field.
+func ClientProfileLTE(v string) predicate.Request {
+	return predicate.Request(sql.FieldLTE(FieldClientProfile, v))
+}
+
+// ClientProfileContains applies the Contains predicate on the "client_profile" field.
+func ClientProfileContains(v string) predicate.Request {
+	return predicate.Request(sql.FieldContains(FieldClientProfile, v))
+}
+
+// ClientProfileHasPrefix applies the HasPrefix predicate on the "client_profile" field.
+func ClientProfileHasPrefix(v string) predicate.Request {
+	return predicate.Request(sql.FieldHasPrefix(FieldClientProfile, v))
+}
+
+// ClientProfileHasSuffix applies the HasSuffix predicate on the "client_profile" field.
+func ClientProfileHasSuffix(v string) predicate.Request {
+	return predicate.Request(sql.FieldHasSuffix(FieldClientProfile, v))
+}
+
+// ClientProfileIsNil applies the IsNil predicate on the "client_profile" field.
+func ClientProfileIsNil() predicate.Request {
+	return predicate.Request(sql.FieldIsNull(FieldClientProfile))
+}
+
+// ClientProfileNotNil applies the NotNil predicate on the "client_profile" field.
+func ClientProfileNotNil() predicate.Request {
+	return predicate.Request(sql.FieldNotNull(FieldClientProfile))
+}
+
+// ClientProfileEqualFold applies the EqualFold predicate on the "client_profile" field.
+func ClientProfileEqualFold(v string) predicate.Request {
+	return predicate.Request(sql.FieldEqualFold(FieldClientProfile, v))
+}
+
+// ClientProfileContainsFold applies the ContainsFold predicate on the "client_profile" field.
+func ClientProfileContainsFold(v string) predicate.Request {
+	return predicate.Request(sql.FieldContainsFold(FieldClientProfile, v))
+}
+
+// ClientDetectSourceEQ applies the EQ predicate on the "client_detect_source" field.
+func ClientDetectSourceEQ(v string) predicate.Request {
+	return predicate.Request(sql.FieldEQ(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceNEQ applies the NEQ predicate on the "client_detect_source" field.
+func ClientDetectSourceNEQ(v string) predicate.Request {
+	return predicate.Request(sql.FieldNEQ(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceIn applies the In predicate on the "client_detect_source" field.
+func ClientDetectSourceIn(vs ...string) predicate.Request {
+	return predicate.Request(sql.FieldIn(FieldClientDetectSource, vs...))
+}
+
+// ClientDetectSourceNotIn applies the NotIn predicate on the "client_detect_source" field.
+func ClientDetectSourceNotIn(vs ...string) predicate.Request {
+	return predicate.Request(sql.FieldNotIn(FieldClientDetectSource, vs...))
+}
+
+// ClientDetectSourceGT applies the GT predicate on the "client_detect_source" field.
+func ClientDetectSourceGT(v string) predicate.Request {
+	return predicate.Request(sql.FieldGT(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceGTE applies the GTE predicate on the "client_detect_source" field.
+func ClientDetectSourceGTE(v string) predicate.Request {
+	return predicate.Request(sql.FieldGTE(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceLT applies the LT predicate on the "client_detect_source" field.
+func ClientDetectSourceLT(v string) predicate.Request {
+	return predicate.Request(sql.FieldLT(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceLTE applies the LTE predicate on the "client_detect_source" field.
+func ClientDetectSourceLTE(v string) predicate.Request {
+	return predicate.Request(sql.FieldLTE(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceContains applies the Contains predicate on the "client_detect_source" field.
+func ClientDetectSourceContains(v string) predicate.Request {
+	return predicate.Request(sql.FieldContains(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceHasPrefix applies the HasPrefix predicate on the "client_detect_source" field.
+func ClientDetectSourceHasPrefix(v string) predicate.Request {
+	return predicate.Request(sql.FieldHasPrefix(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceHasSuffix applies the HasSuffix predicate on the "client_detect_source" field.
+func ClientDetectSourceHasSuffix(v string) predicate.Request {
+	return predicate.Request(sql.FieldHasSuffix(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceIsNil applies the IsNil predicate on the "client_detect_source" field.
+func ClientDetectSourceIsNil() predicate.Request {
+	return predicate.Request(sql.FieldIsNull(FieldClientDetectSource))
+}
+
+// ClientDetectSourceNotNil applies the NotNil predicate on the "client_detect_source" field.
+func ClientDetectSourceNotNil() predicate.Request {
+	return predicate.Request(sql.FieldNotNull(FieldClientDetectSource))
+}
+
+// ClientDetectSourceEqualFold applies the EqualFold predicate on the "client_detect_source" field.
+func ClientDetectSourceEqualFold(v string) predicate.Request {
+	return predicate.Request(sql.FieldEqualFold(FieldClientDetectSource, v))
+}
+
+// ClientDetectSourceContainsFold applies the ContainsFold predicate on the "client_detect_source" field.
+func ClientDetectSourceContainsFold(v string) predicate.Request {
+	return predicate.Request(sql.FieldContainsFold(FieldClientDetectSource, v))
+}
+
+// ClientCompatAppliedEQ applies the EQ predicate on the "client_compat_applied" field.
+func ClientCompatAppliedEQ(v bool) predicate.Request {
+	return predicate.Request(sql.FieldEQ(FieldClientCompatApplied, v))
+}
+
+// ClientCompatAppliedNEQ applies the NEQ predicate on the "client_compat_applied" field.
+func ClientCompatAppliedNEQ(v bool) predicate.Request {
+	return predicate.Request(sql.FieldNEQ(FieldClientCompatApplied, v))
 }
 
 // MetricsLatencyMsEQ applies the EQ predicate on the "metrics_latency_ms" field.

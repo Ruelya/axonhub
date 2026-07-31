@@ -923,6 +923,9 @@ type CreateRequestInput struct {
 	Status                     request.Status
 	Stream                     *bool
 	ClientIP                   *string
+	ClientProfile              *string
+	ClientDetectSource         *string
+	ClientCompatApplied        *bool
 	MetricsLatencyMs           *int64
 	MetricsFirstTokenLatencyMs *int64
 	MetricsReasoningDurationMs *int64
@@ -970,6 +973,15 @@ func (i *CreateRequestInput) Mutate(m *RequestMutation) {
 	}
 	if v := i.ClientIP; v != nil {
 		m.SetClientIP(*v)
+	}
+	if v := i.ClientProfile; v != nil {
+		m.SetClientProfile(*v)
+	}
+	if v := i.ClientDetectSource; v != nil {
+		m.SetClientDetectSource(*v)
+	}
+	if v := i.ClientCompatApplied; v != nil {
+		m.SetClientCompatApplied(*v)
 	}
 	if v := i.MetricsLatencyMs; v != nil {
 		m.SetMetricsLatencyMs(*v)
@@ -1027,6 +1039,11 @@ type UpdateRequestInput struct {
 	ClearExternalID                 bool
 	ExternalID                      *string
 	Status                          *request.Status
+	ClearClientProfile              bool
+	ClientProfile                   *string
+	ClearClientDetectSource         bool
+	ClientDetectSource              *string
+	ClientCompatApplied             *bool
 	ClearMetricsLatencyMs           bool
 	MetricsLatencyMs                *int64
 	ClearMetricsFirstTokenLatencyMs bool
@@ -1081,6 +1098,21 @@ func (i *UpdateRequestInput) Mutate(m *RequestMutation) {
 	}
 	if v := i.Status; v != nil {
 		m.SetStatus(*v)
+	}
+	if i.ClearClientProfile {
+		m.ClearClientProfile()
+	}
+	if v := i.ClientProfile; v != nil {
+		m.SetClientProfile(*v)
+	}
+	if i.ClearClientDetectSource {
+		m.ClearClientDetectSource()
+	}
+	if v := i.ClientDetectSource; v != nil {
+		m.SetClientDetectSource(*v)
+	}
+	if v := i.ClientCompatApplied; v != nil {
+		m.SetClientCompatApplied(*v)
 	}
 	if i.ClearMetricsLatencyMs {
 		m.ClearMetricsLatencyMs()

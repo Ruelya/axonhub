@@ -148,6 +148,60 @@ func (_u *RequestUpdate) SetNillableStatus(v *request.Status) *RequestUpdate {
 	return _u
 }
 
+// SetClientProfile sets the "client_profile" field.
+func (_u *RequestUpdate) SetClientProfile(v string) *RequestUpdate {
+	_u.mutation.SetClientProfile(v)
+	return _u
+}
+
+// SetNillableClientProfile sets the "client_profile" field if the given value is not nil.
+func (_u *RequestUpdate) SetNillableClientProfile(v *string) *RequestUpdate {
+	if v != nil {
+		_u.SetClientProfile(*v)
+	}
+	return _u
+}
+
+// ClearClientProfile clears the value of the "client_profile" field.
+func (_u *RequestUpdate) ClearClientProfile() *RequestUpdate {
+	_u.mutation.ClearClientProfile()
+	return _u
+}
+
+// SetClientDetectSource sets the "client_detect_source" field.
+func (_u *RequestUpdate) SetClientDetectSource(v string) *RequestUpdate {
+	_u.mutation.SetClientDetectSource(v)
+	return _u
+}
+
+// SetNillableClientDetectSource sets the "client_detect_source" field if the given value is not nil.
+func (_u *RequestUpdate) SetNillableClientDetectSource(v *string) *RequestUpdate {
+	if v != nil {
+		_u.SetClientDetectSource(*v)
+	}
+	return _u
+}
+
+// ClearClientDetectSource clears the value of the "client_detect_source" field.
+func (_u *RequestUpdate) ClearClientDetectSource() *RequestUpdate {
+	_u.mutation.ClearClientDetectSource()
+	return _u
+}
+
+// SetClientCompatApplied sets the "client_compat_applied" field.
+func (_u *RequestUpdate) SetClientCompatApplied(v bool) *RequestUpdate {
+	_u.mutation.SetClientCompatApplied(v)
+	return _u
+}
+
+// SetNillableClientCompatApplied sets the "client_compat_applied" field if the given value is not nil.
+func (_u *RequestUpdate) SetNillableClientCompatApplied(v *bool) *RequestUpdate {
+	if v != nil {
+		_u.SetClientCompatApplied(*v)
+	}
+	return _u
+}
+
 // SetMetricsLatencyMs sets the "metrics_latency_ms" field.
 func (_u *RequestUpdate) SetMetricsLatencyMs(v int64) *RequestUpdate {
 	_u.mutation.ResetMetricsLatencyMs()
@@ -524,6 +578,21 @@ func (_u *RequestUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(request.FieldStatus, field.TypeEnum, value)
 	}
+	if value, ok := _u.mutation.ClientProfile(); ok {
+		_spec.SetField(request.FieldClientProfile, field.TypeString, value)
+	}
+	if _u.mutation.ClientProfileCleared() {
+		_spec.ClearField(request.FieldClientProfile, field.TypeString)
+	}
+	if value, ok := _u.mutation.ClientDetectSource(); ok {
+		_spec.SetField(request.FieldClientDetectSource, field.TypeString, value)
+	}
+	if _u.mutation.ClientDetectSourceCleared() {
+		_spec.ClearField(request.FieldClientDetectSource, field.TypeString)
+	}
+	if value, ok := _u.mutation.ClientCompatApplied(); ok {
+		_spec.SetField(request.FieldClientCompatApplied, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.MetricsLatencyMs(); ok {
 		_spec.SetField(request.FieldMetricsLatencyMs, field.TypeInt64, value)
 	}
@@ -826,6 +895,60 @@ func (_u *RequestUpdateOne) SetStatus(v request.Status) *RequestUpdateOne {
 func (_u *RequestUpdateOne) SetNillableStatus(v *request.Status) *RequestUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
+	}
+	return _u
+}
+
+// SetClientProfile sets the "client_profile" field.
+func (_u *RequestUpdateOne) SetClientProfile(v string) *RequestUpdateOne {
+	_u.mutation.SetClientProfile(v)
+	return _u
+}
+
+// SetNillableClientProfile sets the "client_profile" field if the given value is not nil.
+func (_u *RequestUpdateOne) SetNillableClientProfile(v *string) *RequestUpdateOne {
+	if v != nil {
+		_u.SetClientProfile(*v)
+	}
+	return _u
+}
+
+// ClearClientProfile clears the value of the "client_profile" field.
+func (_u *RequestUpdateOne) ClearClientProfile() *RequestUpdateOne {
+	_u.mutation.ClearClientProfile()
+	return _u
+}
+
+// SetClientDetectSource sets the "client_detect_source" field.
+func (_u *RequestUpdateOne) SetClientDetectSource(v string) *RequestUpdateOne {
+	_u.mutation.SetClientDetectSource(v)
+	return _u
+}
+
+// SetNillableClientDetectSource sets the "client_detect_source" field if the given value is not nil.
+func (_u *RequestUpdateOne) SetNillableClientDetectSource(v *string) *RequestUpdateOne {
+	if v != nil {
+		_u.SetClientDetectSource(*v)
+	}
+	return _u
+}
+
+// ClearClientDetectSource clears the value of the "client_detect_source" field.
+func (_u *RequestUpdateOne) ClearClientDetectSource() *RequestUpdateOne {
+	_u.mutation.ClearClientDetectSource()
+	return _u
+}
+
+// SetClientCompatApplied sets the "client_compat_applied" field.
+func (_u *RequestUpdateOne) SetClientCompatApplied(v bool) *RequestUpdateOne {
+	_u.mutation.SetClientCompatApplied(v)
+	return _u
+}
+
+// SetNillableClientCompatApplied sets the "client_compat_applied" field if the given value is not nil.
+func (_u *RequestUpdateOne) SetNillableClientCompatApplied(v *bool) *RequestUpdateOne {
+	if v != nil {
+		_u.SetClientCompatApplied(*v)
 	}
 	return _u
 }
@@ -1235,6 +1358,21 @@ func (_u *RequestUpdateOne) sqlSave(ctx context.Context) (_node *Request, err er
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(request.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.ClientProfile(); ok {
+		_spec.SetField(request.FieldClientProfile, field.TypeString, value)
+	}
+	if _u.mutation.ClientProfileCleared() {
+		_spec.ClearField(request.FieldClientProfile, field.TypeString)
+	}
+	if value, ok := _u.mutation.ClientDetectSource(); ok {
+		_spec.SetField(request.FieldClientDetectSource, field.TypeString, value)
+	}
+	if _u.mutation.ClientDetectSourceCleared() {
+		_spec.ClearField(request.FieldClientDetectSource, field.TypeString)
+	}
+	if value, ok := _u.mutation.ClientCompatApplied(); ok {
+		_spec.SetField(request.FieldClientCompatApplied, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.MetricsLatencyMs(); ok {
 		_spec.SetField(request.FieldMetricsLatencyMs, field.TypeInt64, value)

@@ -248,6 +248,48 @@ func (_c *RequestCreate) SetNillableClientIP(v *string) *RequestCreate {
 	return _c
 }
 
+// SetClientProfile sets the "client_profile" field.
+func (_c *RequestCreate) SetClientProfile(v string) *RequestCreate {
+	_c.mutation.SetClientProfile(v)
+	return _c
+}
+
+// SetNillableClientProfile sets the "client_profile" field if the given value is not nil.
+func (_c *RequestCreate) SetNillableClientProfile(v *string) *RequestCreate {
+	if v != nil {
+		_c.SetClientProfile(*v)
+	}
+	return _c
+}
+
+// SetClientDetectSource sets the "client_detect_source" field.
+func (_c *RequestCreate) SetClientDetectSource(v string) *RequestCreate {
+	_c.mutation.SetClientDetectSource(v)
+	return _c
+}
+
+// SetNillableClientDetectSource sets the "client_detect_source" field if the given value is not nil.
+func (_c *RequestCreate) SetNillableClientDetectSource(v *string) *RequestCreate {
+	if v != nil {
+		_c.SetClientDetectSource(*v)
+	}
+	return _c
+}
+
+// SetClientCompatApplied sets the "client_compat_applied" field.
+func (_c *RequestCreate) SetClientCompatApplied(v bool) *RequestCreate {
+	_c.mutation.SetClientCompatApplied(v)
+	return _c
+}
+
+// SetNillableClientCompatApplied sets the "client_compat_applied" field if the given value is not nil.
+func (_c *RequestCreate) SetNillableClientCompatApplied(v *bool) *RequestCreate {
+	if v != nil {
+		_c.SetClientCompatApplied(*v)
+	}
+	return _c
+}
+
 // SetMetricsLatencyMs sets the "metrics_latency_ms" field.
 func (_c *RequestCreate) SetMetricsLatencyMs(v int64) *RequestCreate {
 	_c.mutation.SetMetricsLatencyMs(v)
@@ -472,6 +514,18 @@ func (_c *RequestCreate) defaults() error {
 		v := request.DefaultClientIP
 		_c.mutation.SetClientIP(v)
 	}
+	if _, ok := _c.mutation.ClientProfile(); !ok {
+		v := request.DefaultClientProfile
+		_c.mutation.SetClientProfile(v)
+	}
+	if _, ok := _c.mutation.ClientDetectSource(); !ok {
+		v := request.DefaultClientDetectSource
+		_c.mutation.SetClientDetectSource(v)
+	}
+	if _, ok := _c.mutation.ClientCompatApplied(); !ok {
+		v := request.DefaultClientCompatApplied
+		_c.mutation.SetClientCompatApplied(v)
+	}
 	if _, ok := _c.mutation.ContentSaved(); !ok {
 		v := request.DefaultContentSaved
 		_c.mutation.SetContentSaved(v)
@@ -519,6 +573,9 @@ func (_c *RequestCreate) check() error {
 	}
 	if _, ok := _c.mutation.ClientIP(); !ok {
 		return &ValidationError{Name: "client_ip", err: errors.New(`ent: missing required field "Request.client_ip"`)}
+	}
+	if _, ok := _c.mutation.ClientCompatApplied(); !ok {
+		return &ValidationError{Name: "client_compat_applied", err: errors.New(`ent: missing required field "Request.client_compat_applied"`)}
 	}
 	if _, ok := _c.mutation.ContentSaved(); !ok {
 		return &ValidationError{Name: "content_saved", err: errors.New(`ent: missing required field "Request.content_saved"`)}
@@ -608,6 +665,18 @@ func (_c *RequestCreate) createSpec() (*Request, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ClientIP(); ok {
 		_spec.SetField(request.FieldClientIP, field.TypeString, value)
 		_node.ClientIP = value
+	}
+	if value, ok := _c.mutation.ClientProfile(); ok {
+		_spec.SetField(request.FieldClientProfile, field.TypeString, value)
+		_node.ClientProfile = value
+	}
+	if value, ok := _c.mutation.ClientDetectSource(); ok {
+		_spec.SetField(request.FieldClientDetectSource, field.TypeString, value)
+		_node.ClientDetectSource = value
+	}
+	if value, ok := _c.mutation.ClientCompatApplied(); ok {
+		_spec.SetField(request.FieldClientCompatApplied, field.TypeBool, value)
+		_node.ClientCompatApplied = value
 	}
 	if value, ok := _c.mutation.MetricsLatencyMs(); ok {
 		_spec.SetField(request.FieldMetricsLatencyMs, field.TypeInt64, value)
@@ -917,6 +986,54 @@ func (u *RequestUpsert) SetStatus(v request.Status) *RequestUpsert {
 // UpdateStatus sets the "status" field to the value that was provided on create.
 func (u *RequestUpsert) UpdateStatus() *RequestUpsert {
 	u.SetExcluded(request.FieldStatus)
+	return u
+}
+
+// SetClientProfile sets the "client_profile" field.
+func (u *RequestUpsert) SetClientProfile(v string) *RequestUpsert {
+	u.Set(request.FieldClientProfile, v)
+	return u
+}
+
+// UpdateClientProfile sets the "client_profile" field to the value that was provided on create.
+func (u *RequestUpsert) UpdateClientProfile() *RequestUpsert {
+	u.SetExcluded(request.FieldClientProfile)
+	return u
+}
+
+// ClearClientProfile clears the value of the "client_profile" field.
+func (u *RequestUpsert) ClearClientProfile() *RequestUpsert {
+	u.SetNull(request.FieldClientProfile)
+	return u
+}
+
+// SetClientDetectSource sets the "client_detect_source" field.
+func (u *RequestUpsert) SetClientDetectSource(v string) *RequestUpsert {
+	u.Set(request.FieldClientDetectSource, v)
+	return u
+}
+
+// UpdateClientDetectSource sets the "client_detect_source" field to the value that was provided on create.
+func (u *RequestUpsert) UpdateClientDetectSource() *RequestUpsert {
+	u.SetExcluded(request.FieldClientDetectSource)
+	return u
+}
+
+// ClearClientDetectSource clears the value of the "client_detect_source" field.
+func (u *RequestUpsert) ClearClientDetectSource() *RequestUpsert {
+	u.SetNull(request.FieldClientDetectSource)
+	return u
+}
+
+// SetClientCompatApplied sets the "client_compat_applied" field.
+func (u *RequestUpsert) SetClientCompatApplied(v bool) *RequestUpsert {
+	u.Set(request.FieldClientCompatApplied, v)
+	return u
+}
+
+// UpdateClientCompatApplied sets the "client_compat_applied" field to the value that was provided on create.
+func (u *RequestUpsert) UpdateClientCompatApplied() *RequestUpsert {
+	u.SetExcluded(request.FieldClientCompatApplied)
 	return u
 }
 
@@ -1272,6 +1389,62 @@ func (u *RequestUpsertOne) SetStatus(v request.Status) *RequestUpsertOne {
 func (u *RequestUpsertOne) UpdateStatus() *RequestUpsertOne {
 	return u.Update(func(s *RequestUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetClientProfile sets the "client_profile" field.
+func (u *RequestUpsertOne) SetClientProfile(v string) *RequestUpsertOne {
+	return u.Update(func(s *RequestUpsert) {
+		s.SetClientProfile(v)
+	})
+}
+
+// UpdateClientProfile sets the "client_profile" field to the value that was provided on create.
+func (u *RequestUpsertOne) UpdateClientProfile() *RequestUpsertOne {
+	return u.Update(func(s *RequestUpsert) {
+		s.UpdateClientProfile()
+	})
+}
+
+// ClearClientProfile clears the value of the "client_profile" field.
+func (u *RequestUpsertOne) ClearClientProfile() *RequestUpsertOne {
+	return u.Update(func(s *RequestUpsert) {
+		s.ClearClientProfile()
+	})
+}
+
+// SetClientDetectSource sets the "client_detect_source" field.
+func (u *RequestUpsertOne) SetClientDetectSource(v string) *RequestUpsertOne {
+	return u.Update(func(s *RequestUpsert) {
+		s.SetClientDetectSource(v)
+	})
+}
+
+// UpdateClientDetectSource sets the "client_detect_source" field to the value that was provided on create.
+func (u *RequestUpsertOne) UpdateClientDetectSource() *RequestUpsertOne {
+	return u.Update(func(s *RequestUpsert) {
+		s.UpdateClientDetectSource()
+	})
+}
+
+// ClearClientDetectSource clears the value of the "client_detect_source" field.
+func (u *RequestUpsertOne) ClearClientDetectSource() *RequestUpsertOne {
+	return u.Update(func(s *RequestUpsert) {
+		s.ClearClientDetectSource()
+	})
+}
+
+// SetClientCompatApplied sets the "client_compat_applied" field.
+func (u *RequestUpsertOne) SetClientCompatApplied(v bool) *RequestUpsertOne {
+	return u.Update(func(s *RequestUpsert) {
+		s.SetClientCompatApplied(v)
+	})
+}
+
+// UpdateClientCompatApplied sets the "client_compat_applied" field to the value that was provided on create.
+func (u *RequestUpsertOne) UpdateClientCompatApplied() *RequestUpsertOne {
+	return u.Update(func(s *RequestUpsert) {
+		s.UpdateClientCompatApplied()
 	})
 }
 
@@ -1817,6 +1990,62 @@ func (u *RequestUpsertBulk) SetStatus(v request.Status) *RequestUpsertBulk {
 func (u *RequestUpsertBulk) UpdateStatus() *RequestUpsertBulk {
 	return u.Update(func(s *RequestUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetClientProfile sets the "client_profile" field.
+func (u *RequestUpsertBulk) SetClientProfile(v string) *RequestUpsertBulk {
+	return u.Update(func(s *RequestUpsert) {
+		s.SetClientProfile(v)
+	})
+}
+
+// UpdateClientProfile sets the "client_profile" field to the value that was provided on create.
+func (u *RequestUpsertBulk) UpdateClientProfile() *RequestUpsertBulk {
+	return u.Update(func(s *RequestUpsert) {
+		s.UpdateClientProfile()
+	})
+}
+
+// ClearClientProfile clears the value of the "client_profile" field.
+func (u *RequestUpsertBulk) ClearClientProfile() *RequestUpsertBulk {
+	return u.Update(func(s *RequestUpsert) {
+		s.ClearClientProfile()
+	})
+}
+
+// SetClientDetectSource sets the "client_detect_source" field.
+func (u *RequestUpsertBulk) SetClientDetectSource(v string) *RequestUpsertBulk {
+	return u.Update(func(s *RequestUpsert) {
+		s.SetClientDetectSource(v)
+	})
+}
+
+// UpdateClientDetectSource sets the "client_detect_source" field to the value that was provided on create.
+func (u *RequestUpsertBulk) UpdateClientDetectSource() *RequestUpsertBulk {
+	return u.Update(func(s *RequestUpsert) {
+		s.UpdateClientDetectSource()
+	})
+}
+
+// ClearClientDetectSource clears the value of the "client_detect_source" field.
+func (u *RequestUpsertBulk) ClearClientDetectSource() *RequestUpsertBulk {
+	return u.Update(func(s *RequestUpsert) {
+		s.ClearClientDetectSource()
+	})
+}
+
+// SetClientCompatApplied sets the "client_compat_applied" field.
+func (u *RequestUpsertBulk) SetClientCompatApplied(v bool) *RequestUpsertBulk {
+	return u.Update(func(s *RequestUpsert) {
+		s.SetClientCompatApplied(v)
+	})
+}
+
+// UpdateClientCompatApplied sets the "client_compat_applied" field to the value that was provided on create.
+func (u *RequestUpsertBulk) UpdateClientCompatApplied() *RequestUpsertBulk {
+	return u.Update(func(s *RequestUpsert) {
+		s.UpdateClientCompatApplied()
 	})
 }
 

@@ -354,6 +354,17 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 	// and transformed paths are covered. Persistence still keeps the raw upstream body.
 	patches, patchActive := biz.ActivePatches(clientCompat, &clientDetect)
 
+	// Persist whether this request engaged client-compat wire patching (for request log UI).
+	if patchActive {
+		if req := outbound.GetRequest(); req != nil {
+			persistCtx, cancel := xcontext.DetachWithTimeout(ctx, time.Second*5)
+			if err := processor.RequestService.UpdateRequestClientCompatApplied(persistCtx, req.ID, true); err != nil {
+				log.Warn(persistCtx, "Failed to mark client_compat_applied", log.Cause(err))
+			}
+			cancel()
+		}
+	}
+
 	// Return result based on stream type
 	if result.Stream {
 		stream := result.EventStream

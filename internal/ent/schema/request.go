@@ -94,6 +94,20 @@ func (Request) Fields() []ent.Field {
 		// Whether the request is a streaming request
 		field.Bool("stream").Default(false).Immutable(),
 		field.String("client_ip").Default("").Immutable(),
+		// Detected coding-agent profile (e.g. grok_build, codex). Empty when unknown.
+		field.String("client_profile").
+			Optional().
+			Default("").
+			Comment("Detected client profile id from headers / User-Agent"),
+		// Detection source: explicit | user_agent | none
+		field.String("client_detect_source").
+			Optional().
+			Default("").
+			Comment("How the client was identified: explicit, user_agent, or none"),
+		// Whether client-compat response wire patches were applied for this request.
+		field.Bool("client_compat_applied").
+			Default(false).
+			Comment("Whether AxonHub applied client-compat response patches on the wire"),
 		// Total latency in milliseconds from request start to completion
 		field.Int64("metrics_latency_ms").Optional().Nillable(),
 		// First token latency in milliseconds (only for streaming requests)

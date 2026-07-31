@@ -196,6 +196,15 @@ func (s *RequestService) CreateRequest(
 		mut = mut.SetClientIP(httpRequest.ClientIP)
 	}
 
+	if detect, ok := GetClientDetect(ctx); ok && detect != nil {
+		if detect.ProfileID != "" {
+			mut = mut.SetClientProfile(detect.ProfileID)
+		}
+		if detect.Source != "" {
+			mut = mut.SetClientDetectSource(detect.Source)
+		}
+	}
+
 	if llmRequest.ReasoningEffort != "" {
 		mut = mut.SetReasoningEffort(llmRequest.ReasoningEffort)
 	}
@@ -1120,6 +1129,23 @@ func (s *RequestService) ClearStaleProcessingOnStartup(ctx context.Context) erro
 	if len(errs) > 0 {
 		return fmt.Errorf("startup cleanup failed: %w", errors.Join(errs...))
 	}
+	return nil
+}
+
+// UpdateRequestClientCompatApplied marks whether client-compat wire patches were applied.
+func (s *RequestService) UpdateRequestClientCompatApplied(ctx context.Context, requestID int, applied bool) error {
+	if requestID == 0 {
+		return nil
+	}
+
+	client := s.entFromContext(ctx)
+	err := client.Request.UpdateOneID(requestID).
+		SetClientCompatApplied(applied).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update request client_compat_applied: %w", err)
+	}
+
 	return nil
 }
 

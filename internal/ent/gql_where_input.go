@@ -6560,6 +6560,44 @@ type RequestWhereInput struct {
 	ClientIPEqualFold    *string  `json:"clientIPEqualFold,omitempty"`
 	ClientIPContainsFold *string  `json:"clientIPContainsFold,omitempty"`
 
+	// "client_profile" field predicates.
+	ClientProfile             *string  `json:"clientProfile,omitempty"`
+	ClientProfileNEQ          *string  `json:"clientProfileNEQ,omitempty"`
+	ClientProfileIn           []string `json:"clientProfileIn,omitempty"`
+	ClientProfileNotIn        []string `json:"clientProfileNotIn,omitempty"`
+	ClientProfileGT           *string  `json:"clientProfileGT,omitempty"`
+	ClientProfileGTE          *string  `json:"clientProfileGTE,omitempty"`
+	ClientProfileLT           *string  `json:"clientProfileLT,omitempty"`
+	ClientProfileLTE          *string  `json:"clientProfileLTE,omitempty"`
+	ClientProfileContains     *string  `json:"clientProfileContains,omitempty"`
+	ClientProfileHasPrefix    *string  `json:"clientProfileHasPrefix,omitempty"`
+	ClientProfileHasSuffix    *string  `json:"clientProfileHasSuffix,omitempty"`
+	ClientProfileIsNil        bool     `json:"clientProfileIsNil,omitempty"`
+	ClientProfileNotNil       bool     `json:"clientProfileNotNil,omitempty"`
+	ClientProfileEqualFold    *string  `json:"clientProfileEqualFold,omitempty"`
+	ClientProfileContainsFold *string  `json:"clientProfileContainsFold,omitempty"`
+
+	// "client_detect_source" field predicates.
+	ClientDetectSource             *string  `json:"clientDetectSource,omitempty"`
+	ClientDetectSourceNEQ          *string  `json:"clientDetectSourceNEQ,omitempty"`
+	ClientDetectSourceIn           []string `json:"clientDetectSourceIn,omitempty"`
+	ClientDetectSourceNotIn        []string `json:"clientDetectSourceNotIn,omitempty"`
+	ClientDetectSourceGT           *string  `json:"clientDetectSourceGT,omitempty"`
+	ClientDetectSourceGTE          *string  `json:"clientDetectSourceGTE,omitempty"`
+	ClientDetectSourceLT           *string  `json:"clientDetectSourceLT,omitempty"`
+	ClientDetectSourceLTE          *string  `json:"clientDetectSourceLTE,omitempty"`
+	ClientDetectSourceContains     *string  `json:"clientDetectSourceContains,omitempty"`
+	ClientDetectSourceHasPrefix    *string  `json:"clientDetectSourceHasPrefix,omitempty"`
+	ClientDetectSourceHasSuffix    *string  `json:"clientDetectSourceHasSuffix,omitempty"`
+	ClientDetectSourceIsNil        bool     `json:"clientDetectSourceIsNil,omitempty"`
+	ClientDetectSourceNotNil       bool     `json:"clientDetectSourceNotNil,omitempty"`
+	ClientDetectSourceEqualFold    *string  `json:"clientDetectSourceEqualFold,omitempty"`
+	ClientDetectSourceContainsFold *string  `json:"clientDetectSourceContainsFold,omitempty"`
+
+	// "client_compat_applied" field predicates.
+	ClientCompatApplied    *bool `json:"clientCompatApplied,omitempty"`
+	ClientCompatAppliedNEQ *bool `json:"clientCompatAppliedNEQ,omitempty"`
+
 	// "metrics_latency_ms" field predicates.
 	MetricsLatencyMs       *int64  `json:"metricsLatencyMs,omitempty"`
 	MetricsLatencyMsNEQ    *int64  `json:"metricsLatencyMsNEQ,omitempty"`
@@ -7133,6 +7171,102 @@ func (i *RequestWhereInput) P() (predicate.Request, error) {
 	}
 	if i.ClientIPContainsFold != nil {
 		predicates = append(predicates, request.ClientIPContainsFold(*i.ClientIPContainsFold))
+	}
+	if i.ClientProfile != nil {
+		predicates = append(predicates, request.ClientProfileEQ(*i.ClientProfile))
+	}
+	if i.ClientProfileNEQ != nil {
+		predicates = append(predicates, request.ClientProfileNEQ(*i.ClientProfileNEQ))
+	}
+	if len(i.ClientProfileIn) > 0 {
+		predicates = append(predicates, request.ClientProfileIn(i.ClientProfileIn...))
+	}
+	if len(i.ClientProfileNotIn) > 0 {
+		predicates = append(predicates, request.ClientProfileNotIn(i.ClientProfileNotIn...))
+	}
+	if i.ClientProfileGT != nil {
+		predicates = append(predicates, request.ClientProfileGT(*i.ClientProfileGT))
+	}
+	if i.ClientProfileGTE != nil {
+		predicates = append(predicates, request.ClientProfileGTE(*i.ClientProfileGTE))
+	}
+	if i.ClientProfileLT != nil {
+		predicates = append(predicates, request.ClientProfileLT(*i.ClientProfileLT))
+	}
+	if i.ClientProfileLTE != nil {
+		predicates = append(predicates, request.ClientProfileLTE(*i.ClientProfileLTE))
+	}
+	if i.ClientProfileContains != nil {
+		predicates = append(predicates, request.ClientProfileContains(*i.ClientProfileContains))
+	}
+	if i.ClientProfileHasPrefix != nil {
+		predicates = append(predicates, request.ClientProfileHasPrefix(*i.ClientProfileHasPrefix))
+	}
+	if i.ClientProfileHasSuffix != nil {
+		predicates = append(predicates, request.ClientProfileHasSuffix(*i.ClientProfileHasSuffix))
+	}
+	if i.ClientProfileIsNil {
+		predicates = append(predicates, request.ClientProfileIsNil())
+	}
+	if i.ClientProfileNotNil {
+		predicates = append(predicates, request.ClientProfileNotNil())
+	}
+	if i.ClientProfileEqualFold != nil {
+		predicates = append(predicates, request.ClientProfileEqualFold(*i.ClientProfileEqualFold))
+	}
+	if i.ClientProfileContainsFold != nil {
+		predicates = append(predicates, request.ClientProfileContainsFold(*i.ClientProfileContainsFold))
+	}
+	if i.ClientDetectSource != nil {
+		predicates = append(predicates, request.ClientDetectSourceEQ(*i.ClientDetectSource))
+	}
+	if i.ClientDetectSourceNEQ != nil {
+		predicates = append(predicates, request.ClientDetectSourceNEQ(*i.ClientDetectSourceNEQ))
+	}
+	if len(i.ClientDetectSourceIn) > 0 {
+		predicates = append(predicates, request.ClientDetectSourceIn(i.ClientDetectSourceIn...))
+	}
+	if len(i.ClientDetectSourceNotIn) > 0 {
+		predicates = append(predicates, request.ClientDetectSourceNotIn(i.ClientDetectSourceNotIn...))
+	}
+	if i.ClientDetectSourceGT != nil {
+		predicates = append(predicates, request.ClientDetectSourceGT(*i.ClientDetectSourceGT))
+	}
+	if i.ClientDetectSourceGTE != nil {
+		predicates = append(predicates, request.ClientDetectSourceGTE(*i.ClientDetectSourceGTE))
+	}
+	if i.ClientDetectSourceLT != nil {
+		predicates = append(predicates, request.ClientDetectSourceLT(*i.ClientDetectSourceLT))
+	}
+	if i.ClientDetectSourceLTE != nil {
+		predicates = append(predicates, request.ClientDetectSourceLTE(*i.ClientDetectSourceLTE))
+	}
+	if i.ClientDetectSourceContains != nil {
+		predicates = append(predicates, request.ClientDetectSourceContains(*i.ClientDetectSourceContains))
+	}
+	if i.ClientDetectSourceHasPrefix != nil {
+		predicates = append(predicates, request.ClientDetectSourceHasPrefix(*i.ClientDetectSourceHasPrefix))
+	}
+	if i.ClientDetectSourceHasSuffix != nil {
+		predicates = append(predicates, request.ClientDetectSourceHasSuffix(*i.ClientDetectSourceHasSuffix))
+	}
+	if i.ClientDetectSourceIsNil {
+		predicates = append(predicates, request.ClientDetectSourceIsNil())
+	}
+	if i.ClientDetectSourceNotNil {
+		predicates = append(predicates, request.ClientDetectSourceNotNil())
+	}
+	if i.ClientDetectSourceEqualFold != nil {
+		predicates = append(predicates, request.ClientDetectSourceEqualFold(*i.ClientDetectSourceEqualFold))
+	}
+	if i.ClientDetectSourceContainsFold != nil {
+		predicates = append(predicates, request.ClientDetectSourceContainsFold(*i.ClientDetectSourceContainsFold))
+	}
+	if i.ClientCompatApplied != nil {
+		predicates = append(predicates, request.ClientCompatAppliedEQ(*i.ClientCompatApplied))
+	}
+	if i.ClientCompatAppliedNEQ != nil {
+		predicates = append(predicates, request.ClientCompatAppliedNEQ(*i.ClientCompatAppliedNEQ))
 	}
 	if i.MetricsLatencyMs != nil {
 		predicates = append(predicates, request.MetricsLatencyMsEQ(*i.MetricsLatencyMs))
