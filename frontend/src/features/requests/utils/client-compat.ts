@@ -241,16 +241,9 @@ export type DiffLine = {
 
 /**
  * Line-oriented LCS diff for code-review style display.
- * Produces classic - / + / space rows with optional context collapse.
+ * Full file is returned (no collapse) so the viewer can scroll freely.
  */
-export function buildLineDiff(
-  before: string,
-  after: string,
-  options?: { context?: number; collapseThreshold?: number }
-): DiffLine[] {
-  const context = options?.context ?? 3;
-  const collapseThreshold = options?.collapseThreshold ?? 8;
-
+export function buildLineDiff(before: string, after: string): DiffLine[] {
   const a = before.length ? before.split('\n') : [''];
   const b = after.length ? after.split('\n') : [''];
 
@@ -270,74 +263,37 @@ export function buildLineDiff(
     }
   }
 
-  const raw: DiffLine[] = [];
+  const result: DiffLine[] = [];
   let i = 0;
   let j = 0;
   let oldLine = 1;
   let newLine = 1;
   while (i < n && j < m) {
     if (a[i] === b[j]) {
-      raw.push({ type: 'same', text: a[i], oldLine, newLine });
+      result.push({ type: 'same', text: a[i], oldLine, newLine });
       i++;
       j++;
       oldLine++;
       newLine++;
     } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      raw.push({ type: 'del', text: a[i], oldLine });
+      result.push({ type: 'del', text: a[i], oldLine });
       i++;
       oldLine++;
     } else {
-      raw.push({ type: 'add', text: b[j], newLine });
+      result.push({ type: 'add', text: b[j], newLine });
       j++;
       newLine++;
     }
   }
   while (i < n) {
-    raw.push({ type: 'del', text: a[i], oldLine });
+    result.push({ type: 'del', text: a[i], oldLine });
     i++;
     oldLine++;
   }
   while (j < m) {
-    raw.push({ type: 'add', text: b[j], newLine });
+    result.push({ type: 'add', text: b[j], newLine });
     j++;
     newLine++;
-  }
-
-  // Mark change neighborhoods, keep context, collapse long equal runs
-  const keep = new Array(raw.length).fill(false);
-  for (let k = 0; k < raw.length; k++) {
-    if (raw[k].type !== 'same') {
-      for (let t = Math.max(0, k - context); t <= Math.min(raw.length - 1, k + context); t++) {
-        keep[t] = true;
-      }
-    }
-  }
-  // If no changes, show a short head of the file
-  if (!keep.some(Boolean)) {
-    const head = Math.min(raw.length, 40);
-    for (let k = 0; k < head; k++) keep[k] = true;
-  }
-
-  const result: DiffLine[] = [];
-  let k = 0;
-  while (k < raw.length) {
-    if (keep[k]) {
-      result.push(raw[k]);
-      k++;
-      continue;
-    }
-    let end = k;
-    while (end < raw.length && !keep[end]) end++;
-    const skipped = end - k;
-    if (skipped >= collapseThreshold) {
-      result.push({
-        type: 'meta',
-        text: `··· ${skipped} unchanged lines ···`,
-      });
-    } else {
-      for (let t = k; t < end; t++) result.push(raw[t]);
-    }
-    k = end;
   }
 
   return result;

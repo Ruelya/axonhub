@@ -62,6 +62,8 @@
   "requests.client.compat.beforeShort": "落库",
   "requests.client.compat.afterShort": "出站",
   "requests.client.compat.diffHeader": "统一 diff",
+  "requests.client.compat.copyPatched": "复制补正后",
+  "requests.client.compat.copyPatchedSuccess": "已复制补正后的响应体",
   "requests.client.compat.responseDiffTitle": "兼容补正 Diff",
   "requests.client.schema.title": "API 格式对比",
   "requests.client.schema.description": "按识别客户端与请求 API 格式，对照内置模板列出差异。",

@@ -1,8 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Copy } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -62,7 +65,7 @@ function gutterBg(type: DiffLine['type']): string {
 }
 
 function DiffMarker({ type }: { type: DiffLine['type'] }) {
-  const ch = type === 'add' ? '+' : type === 'del' ? '-' : type === 'meta' ? ' ' : ' ';
+  const ch = type === 'add' ? '+' : type === 'del' ? '-' : ' ';
   return (
     <span
       className={cn(
@@ -108,11 +111,17 @@ export function ResponseCompatDiff({
 
   const beforeText = useMemo(() => formatJSON(original), [original]);
   const afterText = useMemo(() => formatJSON(patched), [patched]);
-  const lines = useMemo(
-    () => buildLineDiff(beforeText, afterText, { context: 4, collapseThreshold: 10 }),
-    [beforeText, afterText]
-  );
+  const lines = useMemo(() => buildLineDiff(beforeText, afterText), [beforeText, afterText]);
   const stats = useMemo(() => diffStats(lines), [lines]);
+
+  const copyPatched = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(afterText);
+      toast.success(t('requests.client.compat.copyPatchedSuccess'));
+    } catch {
+      toast.error(t('common.error.copyFailed', { defaultValue: 'Copy failed' }));
+    }
+  }, [afterText, t]);
 
   if (!responseBody) {
     return (
@@ -153,6 +162,19 @@ export function ResponseCompatDiff({
           <span className='text-muted-foreground text-xs'>{t('requests.client.compat.noBodyDelta')}</span>
         )}
         <span className='text-muted-foreground text-xs'>{t('requests.client.compat.diffHint')}</span>
+        <div className='ml-auto'>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            className='h-7 gap-1.5 px-2 text-xs'
+            onClick={copyPatched}
+            disabled={!afterText}
+          >
+            <Copy className='h-3.5 w-3.5' />
+            {t('requests.client.compat.copyPatched')}
+          </Button>
+        </div>
       </div>
 
       <div className='bg-muted/20 overflow-hidden rounded-lg border'>

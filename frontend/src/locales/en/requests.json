@@ -62,6 +62,8 @@
   "requests.client.compat.beforeShort": "stored",
   "requests.client.compat.afterShort": "outbound",
   "requests.client.compat.diffHeader": "Unified diff",
+  "requests.client.compat.copyPatched": "Copy patched",
+  "requests.client.compat.copyPatchedSuccess": "Patched response body copied",
   "requests.client.compat.responseDiffTitle": "Compatibility patch diff",
   "requests.client.schema.title": "API format compare",
   "requests.client.schema.description": "Compare the response against the built-in template for the detected client and API format.",
