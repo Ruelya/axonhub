@@ -627,7 +627,6 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                   <ResponseCompatDiff
                     responseBody={request.responseBody}
                     compat={clientCompat}
-                    mode='side-by-side'
                   />
                 </div>
               )}
@@ -968,7 +967,6 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                                 <ResponseCompatDiff
                                   responseBody={execution.responseBody}
                                   compat={clientCompat}
-                                  mode='side-by-side'
                                 />
                               ) : (
                                 <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>

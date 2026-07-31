@@ -392,7 +392,7 @@ export function RequestBodyDrawer({
                           <ResponseCompatDiff
                             responseBody={displayedRequest.responseBody}
                             compat={compat}
-                            mode='unified'
+                            compact
                           />
                         )}
                         <ScrollArea className='bg-muted/20 h-[min(50vh,420px)] w-full rounded-lg border p-4'>

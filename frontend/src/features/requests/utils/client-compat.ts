@@ -228,36 +228,128 @@ export function formatJSON(data: unknown): string {
   }
 }
 
-/** Build a simple line-oriented diff for preview (added/removed lines). */
+export type DiffLineType = 'same' | 'add' | 'del' | 'meta';
+
+export type DiffLine = {
+  type: DiffLineType;
+  text: string;
+  /** 1-based line number in the "before" document (del / same). */
+  oldLine?: number;
+  /** 1-based line number in the "after" document (add / same). */
+  newLine?: number;
+};
+
+/**
+ * Line-oriented LCS diff for code-review style display.
+ * Produces classic - / + / space rows with optional context collapse.
+ */
 export function buildLineDiff(
   before: string,
-  after: string
-): Array<{ type: 'same' | 'add' | 'del'; text: string }> {
-  const a = before.split('\n');
-  const b = after.split('\n');
-  // LCS-free simple scan for UI (good enough for annotations fills).
-  const result: Array<{ type: 'same' | 'add' | 'del'; text: string }> = [];
+  after: string,
+  options?: { context?: number; collapseThreshold?: number }
+): DiffLine[] {
+  const context = options?.context ?? 3;
+  const collapseThreshold = options?.collapseThreshold ?? 8;
+
+  const a = before.length ? before.split('\n') : [''];
+  const b = after.length ? after.split('\n') : [''];
+
+  // Drop trailing empty line from JSON.stringify (common when body ends with }\n)
+  if (a.length > 1 && a[a.length - 1] === '') a.pop();
+  if (b.length > 1 && b[b.length - 1] === '') b.pop();
+
+  const n = a.length;
+  const m = b.length;
+
+  // DP LCS length table (fine for response bodies of a few thousand lines)
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      if (a[i] === b[j]) dp[i][j] = dp[i + 1][j + 1] + 1;
+      else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const raw: DiffLine[] = [];
   let i = 0;
   let j = 0;
-  while (i < a.length || j < b.length) {
-    if (i < a.length && j < b.length && a[i] === b[j]) {
-      result.push({ type: 'same', text: a[i] });
+  let oldLine = 1;
+  let newLine = 1;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      raw.push({ type: 'same', text: a[i], oldLine, newLine });
       i++;
       j++;
-      continue;
-    }
-    // Prefer showing deletes then adds when lines diverge
-    if (i < a.length && (j >= b.length || !b.slice(j).includes(a[i]))) {
-      result.push({ type: 'del', text: a[i] });
+      oldLine++;
+      newLine++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      raw.push({ type: 'del', text: a[i], oldLine });
       i++;
-      continue;
-    }
-    if (j < b.length) {
-      result.push({ type: 'add', text: b[j] });
+      oldLine++;
+    } else {
+      raw.push({ type: 'add', text: b[j], newLine });
       j++;
-      continue;
+      newLine++;
     }
-    break;
   }
+  while (i < n) {
+    raw.push({ type: 'del', text: a[i], oldLine });
+    i++;
+    oldLine++;
+  }
+  while (j < m) {
+    raw.push({ type: 'add', text: b[j], newLine });
+    j++;
+    newLine++;
+  }
+
+  // Mark change neighborhoods, keep context, collapse long equal runs
+  const keep = new Array(raw.length).fill(false);
+  for (let k = 0; k < raw.length; k++) {
+    if (raw[k].type !== 'same') {
+      for (let t = Math.max(0, k - context); t <= Math.min(raw.length - 1, k + context); t++) {
+        keep[t] = true;
+      }
+    }
+  }
+  // If no changes, show a short head of the file
+  if (!keep.some(Boolean)) {
+    const head = Math.min(raw.length, 40);
+    for (let k = 0; k < head; k++) keep[k] = true;
+  }
+
+  const result: DiffLine[] = [];
+  let k = 0;
+  while (k < raw.length) {
+    if (keep[k]) {
+      result.push(raw[k]);
+      k++;
+      continue;
+    }
+    let end = k;
+    while (end < raw.length && !keep[end]) end++;
+    const skipped = end - k;
+    if (skipped >= collapseThreshold) {
+      result.push({
+        type: 'meta',
+        text: `··· ${skipped} unchanged lines ···`,
+      });
+    } else {
+      for (let t = k; t < end; t++) result.push(raw[t]);
+    }
+    k = end;
+  }
+
   return result;
+}
+
+/** Stats for header badges. */
+export function diffStats(lines: DiffLine[]): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  for (const line of lines) {
+    if (line.type === 'add') additions++;
+    else if (line.type === 'del') deletions++;
+  }
+  return { additions, deletions };
 }
