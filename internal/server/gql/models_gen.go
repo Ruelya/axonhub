@@ -573,6 +573,30 @@ type UpdateBrandSettingsInput struct {
 	Title     *string `json:"title,omitempty"`
 }
 
+type UpdateClientCompatSettingsInput struct {
+	Enabled               *bool                       `json:"enabled,omitempty"`
+	ExplicitHeader        *string                     `json:"explicitHeader,omitempty"`
+	ExplicitVersionHeader *string                     `json:"explicitVersionHeader,omitempty"`
+	UserAgentRules        []*UpdateClientUARuleInput  `json:"userAgentRules,omitempty"`
+	Profiles              []*UpdateClientProfileInput `json:"profiles,omitempty"`
+}
+
+type UpdateClientProfileInput struct {
+	ID                          string  `json:"id"`
+	Enabled                     *bool   `json:"enabled,omitempty"`
+	TemplateID                  *string `json:"templateId,omitempty"`
+	EnsureOutputTextAnnotations *bool   `json:"ensureOutputTextAnnotations,omitempty"`
+}
+
+type UpdateClientUARuleInput struct {
+	ID        string `json:"id"`
+	Pattern   string `json:"pattern"`
+	ProfileID string `json:"profileId"`
+	Priority  int    `json:"priority"`
+	Enabled   bool   `json:"enabled"`
+	IsRegex   *bool  `json:"isRegex,omitempty"`
+}
+
 type UpdateDefaultDataStorageInput struct {
 	DataStorageID objects.GUID `json:"dataStorageID"`
 }

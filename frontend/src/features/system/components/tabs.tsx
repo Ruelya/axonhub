@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useHorizontalScroll } from '@/hooks/use-horizontal-scroll';
 import { AboutSettings } from './about-settings';
 import { BrandSettings } from './brand-settings';
+import { ClientCompatSettings } from './client-compat-settings';
 import { DiagnosticsSettings } from './diagnostics-settings';
 import { GeneralSettings } from './general-settings';
 import { QuotaSettings } from './quota-settings';
@@ -17,7 +18,19 @@ import { ProxyPresetsSettings } from './proxy-presets-settings';
 import { WebhookSettings } from './webhook-settings';
 import { usePermissions } from '@/hooks/usePermissions';
 
-type SystemTabKey = 'general' | 'security' | 'brand' | 'storage' | 'retry' | 'webhook' | 'proxy' | 'quota' | 'backup' | 'diagnostics' | 'about';
+type SystemTabKey =
+  | 'general'
+  | 'security'
+  | 'brand'
+  | 'storage'
+  | 'retry'
+  | 'webhook'
+  | 'proxy'
+  | 'quota'
+  | 'client-compat'
+  | 'backup'
+  | 'diagnostics'
+  | 'about';
 
 const systemTabKeys = new Set<SystemTabKey>([
   'general',
@@ -28,6 +41,7 @@ const systemTabKeys = new Set<SystemTabKey>([
   'webhook',
   'proxy',
   'quota',
+  'client-compat',
   'backup',
   'diagnostics',
   'about',
@@ -131,6 +145,9 @@ export function SystemSettingsTabs({ initialTab }: SystemSettingsTabsProps) {
         <TabsTrigger value='quota' data-value='quota'>
           {t('system.tabs.quota')}
         </TabsTrigger>
+        <TabsTrigger value='client-compat' data-value='client-compat'>
+          {t('system.tabs.clientCompat')}
+        </TabsTrigger>
         {isOwner && (
           <TabsTrigger value='diagnostics' data-value='diagnostics'>
             {t('system.tabs.diagnostics')}
@@ -169,6 +186,9 @@ export function SystemSettingsTabs({ initialTab }: SystemSettingsTabsProps) {
         </TabsContent>
         <TabsContent value='quota' className='mt-0 p-0'>
           <QuotaSettings />
+        </TabsContent>
+        <TabsContent value='client-compat' className='mt-0 p-0'>
+          <ClientCompatSettings />
         </TabsContent>
         {isOwner && (
           <TabsContent value='diagnostics' className='mt-0 p-0'>

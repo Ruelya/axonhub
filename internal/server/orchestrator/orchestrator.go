@@ -173,6 +173,19 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 
 	apiKey, _ := contexts.GetAPIKey(ctx)
 
+	// Client identification (header > UA). Used for logging and optional response wire patches.
+	clientCompat := processor.SystemService.ClientCompatSettingsOrDefault(ctx)
+	clientDetect := biz.DetectClient(clientCompat, request.Headers)
+	ctx = biz.WithClientDetect(ctx, &clientDetect)
+	if log.DebugEnabled(ctx) {
+		log.Debug(ctx, "client detected",
+			log.String("profile", clientDetect.ProfileID),
+			log.String("source", clientDetect.Source),
+			log.String("ua", clientDetect.UserAgent),
+			log.String("explicit", clientDetect.ClientHeader),
+		)
+	}
+
 	// Get retry policy from system settings
 	retryPolicy := processor.SystemService.RetryPolicyOrDefault(ctx)
 
@@ -337,16 +350,41 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 		return ChatCompletionResult{}, err
 	}
 
+	// Apply client-wire compatibility patches after the pipeline so both pass-through
+	// and transformed paths are covered. Persistence still keeps the raw upstream body.
+	patches, patchActive := biz.ActivePatches(clientCompat, &clientDetect)
+
 	// Return result based on stream type
 	if result.Stream {
+		stream := result.EventStream
+		if patchActive {
+			stream = biz.WrapClientCompatStream(stream, patches, true)
+			log.Debug(ctx, "client compat stream patch enabled",
+				log.String("profile", clientDetect.ProfileID),
+				log.Bool("ensure_output_text_annotations", patches.EnsureOutputTextAnnotations),
+			)
+		}
 		return ChatCompletionResult{
 			ChatCompletion:       nil,
-			ChatCompletionStream: result.EventStream,
+			ChatCompletionStream: stream,
 		}, nil
 	}
 
+	resp := result.Response
+	if patchActive && resp != nil && len(resp.Body) > 0 {
+		if patched, ok := biz.PatchResponseBody(resp.Body, patches); ok {
+			// Shallow copy so we do not mutate shared response buffers.
+			cp := *resp
+			cp.Body = patched
+			resp = &cp
+			log.Debug(ctx, "client compat response body patch applied",
+				log.String("profile", clientDetect.ProfileID),
+			)
+		}
+	}
+
 	return ChatCompletionResult{
-		ChatCompletion:       result.Response,
+		ChatCompletion:       resp,
 		ChatCompletionStream: nil,
 	}, nil
 }

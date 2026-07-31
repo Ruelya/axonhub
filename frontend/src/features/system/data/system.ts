@@ -1208,6 +1208,251 @@ export function useUpdateSecuritySettings() {
   });
 }
 
+// --- Client compatibility ---
+
+export interface ClientUARule {
+  id: string;
+  pattern: string;
+  profileId: string;
+  priority: number;
+  enabled: boolean;
+  isRegex: boolean;
+}
+
+export interface ClientPatchConfig {
+  ensureOutputTextAnnotations: boolean;
+}
+
+export interface ClientProfileView {
+  id: string;
+  displayName: string;
+  enabled: boolean;
+  templateId: string;
+  patches: ClientPatchConfig;
+}
+
+export interface ClientTemplate {
+  id: string;
+  displayName: string;
+  description: string;
+  requiredPaths: string[];
+  absentVsEmptyArrayPaths: string[];
+  builtin: boolean;
+}
+
+export interface ClientCompatView {
+  enabled: boolean;
+  detection: {
+    explicitHeader: string;
+    explicitVersionHeader: string;
+    userAgentRules: ClientUARule[];
+  };
+  profiles: ClientProfileView[];
+  templates: ClientTemplate[];
+}
+
+export interface UpdateClientCompatSettingsInput {
+  enabled?: boolean;
+  explicitHeader?: string;
+  explicitVersionHeader?: string;
+  userAgentRules?: Array<{
+    id: string;
+    pattern: string;
+    profileId: string;
+    priority: number;
+    enabled: boolean;
+    isRegex?: boolean;
+  }>;
+  profiles?: Array<{
+    id: string;
+    enabled?: boolean;
+    templateId?: string;
+    ensureOutputTextAnnotations?: boolean;
+  }>;
+}
+
+export interface ClientDetectResultGQL {
+  profileId: string;
+  displayName: string;
+  source: string;
+  confidence: string;
+  userAgent?: string | null;
+  clientHeader?: string | null;
+  clientVersion?: string | null;
+  matchedRules?: string[] | null;
+  rawProfileId?: string | null;
+}
+
+export interface ClientSchemaCompareResult {
+  templateId: string;
+  missingPaths: string[];
+  extraPaths: string[];
+  typeMismatches: string[];
+  absentVsEmptyArrays: string[];
+}
+
+export interface ClientCompatPatchPreview {
+  changed: boolean;
+  patchedJson: string;
+  compare?: ClientSchemaCompareResult | null;
+}
+
+const CLIENT_COMPAT_SETTINGS_QUERY = `
+  query ClientCompatSettings {
+    clientCompatSettings {
+      enabled
+      detection {
+        explicitHeader
+        explicitVersionHeader
+        userAgentRules {
+          id
+          pattern
+          profileId
+          priority
+          enabled
+          isRegex
+        }
+      }
+      profiles {
+        id
+        displayName
+        enabled
+        templateId
+        patches {
+          ensureOutputTextAnnotations
+        }
+      }
+      templates {
+        id
+        displayName
+        description
+        requiredPaths
+        absentVsEmptyArrayPaths
+        builtin
+      }
+    }
+  }
+`;
+
+const UPDATE_CLIENT_COMPAT_SETTINGS_MUTATION = `
+  mutation UpdateClientCompatSettings($input: UpdateClientCompatSettingsInput!) {
+    updateClientCompatSettings(input: $input)
+  }
+`;
+
+const TEST_CLIENT_DETECT_QUERY = `
+  query TestClientDetect($userAgent: String, $clientHeader: String, $clientVersionHeader: String) {
+    testClientDetect(userAgent: $userAgent, clientHeader: $clientHeader, clientVersionHeader: $clientVersionHeader) {
+      profileId
+      displayName
+      source
+      confidence
+      userAgent
+      clientHeader
+      clientVersion
+      matchedRules
+      rawProfileId
+    }
+  }
+`;
+
+const COMPARE_CLIENT_SCHEMA_QUERY = `
+  query CompareClientSchema($templateId: String!, $document: String!) {
+    compareClientSchema(templateId: $templateId, document: $document) {
+      templateId
+      missingPaths
+      extraPaths
+      typeMismatches
+      absentVsEmptyArrays
+    }
+  }
+`;
+
+const PREVIEW_CLIENT_COMPAT_PATCH_MUTATION = `
+  mutation PreviewClientCompatPatch($document: String!, $ensureOutputTextAnnotations: Boolean!, $templateId: String) {
+    previewClientCompatPatch(document: $document, ensureOutputTextAnnotations: $ensureOutputTextAnnotations, templateId: $templateId) {
+      changed
+      patchedJson
+      compare {
+        templateId
+        missingPaths
+        extraPaths
+        typeMismatches
+        absentVsEmptyArrays
+      }
+    }
+  }
+`;
+
+export function useClientCompatSettings() {
+  const { handleError } = useErrorHandler();
+  const { hasSystemScope } = usePermissions();
+
+  return useQuery({
+    queryKey: ['clientCompatSettings'],
+    enabled: hasSystemScope('read_settings'),
+    queryFn: async () => {
+      try {
+        const data = await graphqlRequest<{ clientCompatSettings: ClientCompatView }>(CLIENT_COMPAT_SETTINGS_QUERY);
+        return data.clientCompatSettings;
+      } catch (error) {
+        handleError(error, i18n.t('common.errors.internalServerError'));
+        throw error;
+      }
+    },
+  });
+}
+
+export function useUpdateClientCompatSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateClientCompatSettingsInput) => {
+      const data = await graphqlRequest<{ updateClientCompatSettings: boolean }>(UPDATE_CLIENT_COMPAT_SETTINGS_MUTATION, {
+        input,
+      });
+      return data.updateClientCompatSettings;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientCompatSettings'] });
+      toast.success(i18n.t('common.success.systemUpdated'));
+    },
+    onError: () => {
+      toast.error(i18n.t('common.errors.systemUpdateFailed'));
+    },
+  });
+}
+
+export function useTestClientDetect() {
+  return useMutation({
+    mutationFn: async (vars: { userAgent?: string; clientHeader?: string; clientVersionHeader?: string }) => {
+      const data = await graphqlRequest<{ testClientDetect: ClientDetectResultGQL }>(TEST_CLIENT_DETECT_QUERY, vars);
+      return data.testClientDetect;
+    },
+  });
+}
+
+export function useCompareClientSchema() {
+  return useMutation({
+    mutationFn: async (vars: { templateId: string; document: string }) => {
+      const data = await graphqlRequest<{ compareClientSchema: ClientSchemaCompareResult }>(COMPARE_CLIENT_SCHEMA_QUERY, vars);
+      return data.compareClientSchema;
+    },
+  });
+}
+
+export function usePreviewClientCompatPatch() {
+  return useMutation({
+    mutationFn: async (vars: { document: string; ensureOutputTextAnnotations: boolean; templateId?: string }) => {
+      const data = await graphqlRequest<{ previewClientCompatPatch: ClientCompatPatchPreview }>(
+        PREVIEW_CLIENT_COMPAT_PATCH_MUTATION,
+        vars
+      );
+      return data.previewClientCompatPatch;
+    },
+  });
+}
+
 // Backup and Restore
 const BACKUP_MUTATION = `
   mutation Backup($input: BackupOptionsInput!) {

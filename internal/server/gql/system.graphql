@@ -341,6 +341,100 @@ input UpdatePassThroughSettingsInput {
   enabled: Boolean!
 }
 
+# --- Client compatibility (coding agent detect + response wire patches) ---
+
+type ClientUARule {
+  id: String!
+  pattern: String!
+  profileId: String!
+  priority: Int!
+  enabled: Boolean!
+  isRegex: Boolean!
+}
+
+type ClientDetectionConfig {
+  explicitHeader: String!
+  explicitVersionHeader: String!
+  userAgentRules: [ClientUARule!]!
+}
+
+type ClientPatchConfig {
+  ensureOutputTextAnnotations: Boolean!
+}
+
+type ClientProfileView {
+  id: String!
+  displayName: String!
+  enabled: Boolean!
+  templateId: String!
+  patches: ClientPatchConfig!
+}
+
+type ClientTemplate {
+  id: String!
+  displayName: String!
+  description: String!
+  requiredPaths: [String!]!
+  absentVsEmptyArrayPaths: [String!]!
+  builtin: Boolean!
+}
+
+type ClientCompatView {
+  enabled: Boolean!
+  detection: ClientDetectionConfig!
+  profiles: [ClientProfileView!]!
+  templates: [ClientTemplate!]!
+}
+
+input UpdateClientUARuleInput {
+  id: String!
+  pattern: String!
+  profileId: String!
+  priority: Int!
+  enabled: Boolean!
+  isRegex: Boolean
+}
+
+input UpdateClientProfileInput {
+  id: String!
+  enabled: Boolean
+  templateId: String
+  ensureOutputTextAnnotations: Boolean
+}
+
+input UpdateClientCompatSettingsInput {
+  enabled: Boolean
+  explicitHeader: String
+  explicitVersionHeader: String
+  userAgentRules: [UpdateClientUARuleInput!]
+  profiles: [UpdateClientProfileInput!]
+}
+
+type ClientDetectResult {
+  profileId: String!
+  displayName: String!
+  source: String!
+  confidence: String!
+  userAgent: String
+  clientHeader: String
+  clientVersion: String
+  matchedRules: [String!]
+  rawProfileId: String
+}
+
+type ClientSchemaCompareResult {
+  templateId: String!
+  missingPaths: [String!]!
+  extraPaths: [String!]!
+  typeMismatches: [String!]!
+  absentVsEmptyArrays: [String!]!
+}
+
+type ClientCompatPatchPreview {
+  changed: Boolean!
+  patchedJson: String!
+  compare: ClientSchemaCompareResult
+}
 
 type ProxyPreset {
   name: String
@@ -390,6 +484,8 @@ extend type Mutation {
   deleteProxyPreset(url: String!): Boolean!
   updateUserAgentPassThroughSettings(input: UpdateUserAgentPassThroughSettingsInput!): Boolean!
   updatePassThroughSettings(input: UpdatePassThroughSettingsInput!): Boolean!
+  updateClientCompatSettings(input: UpdateClientCompatSettingsInput!): Boolean!
+  previewClientCompatPatch(document: String!, ensureOutputTextAnnotations: Boolean!, templateId: String): ClientCompatPatchPreview!
 }
 
 extend type Query {
@@ -455,6 +551,9 @@ extend type Query {
   proxyPresets: [ProxyPreset!]!
   userAgentPassThroughSettings: UserAgentPassThroughSettings!
   passThroughSettings: PassThroughSettings!
+  clientCompatSettings: ClientCompatView!
+  testClientDetect(userAgent: String, clientHeader: String, clientVersionHeader: String): ClientDetectResult!
+  compareClientSchema(templateId: String!, document: String!): ClientSchemaCompareResult!
   getCacheDiagnostics(input: GetCacheDiagnosticsInput): GetCacheDiagnosticsPayload!
 }
 

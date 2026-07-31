@@ -315,6 +315,80 @@ func (r *mutationResolver) UpdatePassThroughSettings(ctx context.Context, input 
 	return true, nil
 }
 
+// UpdateClientCompatSettings is the resolver for the updateClientCompatSettings field.
+func (r *mutationResolver) UpdateClientCompatSettings(ctx context.Context, input UpdateClientCompatSettingsInput) (bool, error) {
+	update := biz.ClientCompatUpdate{
+		Enabled:               input.Enabled,
+		ExplicitHeader:        input.ExplicitHeader,
+		ExplicitVersionHeader: input.ExplicitVersionHeader,
+	}
+	if input.UserAgentRules != nil {
+		rules := make([]biz.ClientUARule, 0, len(input.UserAgentRules))
+		for _, rule := range input.UserAgentRules {
+			if rule == nil {
+				continue
+			}
+			isRegex := false
+			if rule.IsRegex != nil {
+				isRegex = *rule.IsRegex
+			}
+			rules = append(rules, biz.ClientUARule{
+				ID:        rule.ID,
+				Pattern:   rule.Pattern,
+				ProfileID: rule.ProfileID,
+				Priority:  rule.Priority,
+				Enabled:   rule.Enabled,
+				IsRegex:   isRegex,
+			})
+		}
+		update.UserAgentRules = rules
+	}
+	if input.Profiles != nil {
+		profiles := make([]biz.ClientProfileUpdate, 0, len(input.Profiles))
+		for _, p := range input.Profiles {
+			if p == nil {
+				continue
+			}
+			profiles = append(profiles, biz.ClientProfileUpdate{
+				ID:                          p.ID,
+				Enabled:                     p.Enabled,
+				TemplateID:                  p.TemplateID,
+				EnsureOutputTextAnnotations: p.EnsureOutputTextAnnotations,
+			})
+		}
+		update.Profiles = profiles
+	}
+	if err := r.systemService.ApplyClientCompatUpdate(ctx, update); err != nil {
+		return false, fmt.Errorf("failed to update client compat settings: %w", err)
+	}
+	return true, nil
+}
+
+// PreviewClientCompatPatch is the resolver for the previewClientCompatPatch field.
+func (r *mutationResolver) PreviewClientCompatPatch(ctx context.Context, document string, ensureOutputTextAnnotations bool, templateID *string) (*biz.ClientCompatPatchPreview, error) {
+	patched, changed := biz.ApplySelectedPatches([]byte(document), ensureOutputTextAnnotations)
+	preview := &biz.ClientCompatPatchPreview{
+		Changed:     changed,
+		PatchedJSON: string(patched),
+	}
+	tid := biz.TemplateGrokBuildResponsesV1
+	if templateID != nil && *templateID != "" {
+		tid = *templateID
+	}
+	settings := r.systemService.ClientCompatSettingsOrDefault(ctx)
+	tpl, ok := settings.Templates[tid]
+	if !ok {
+		def := biz.DefaultClientCompatSettings()
+		tpl = def.Templates[tid]
+	}
+	if tpl.ID != "" {
+		if cmp, err := biz.CompareJSONAgainstTemplate(patched, tpl); err == nil {
+			preview.Compare = cmp
+		}
+	}
+	return preview, nil
+}
+
 // ClearCache is the resolver for the clearCache field.
 func (r *mutationResolver) ClearCache(ctx context.Context, input ClearCacheInput) (*ClearCachePayload, error) {
 	user, ok := contexts.GetUser(ctx)
@@ -553,6 +627,60 @@ func (r *queryResolver) PassThroughSettings(ctx context.Context) (*PassThroughSe
 	return &PassThroughSettings{
 		Enabled: enabled,
 	}, nil
+}
+
+// ClientCompatSettings is the resolver for the clientCompatSettings field.
+func (r *queryResolver) ClientCompatSettings(ctx context.Context) (*biz.ClientCompatView, error) {
+	settings, err := r.systemService.ClientCompatSettings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client compat settings: %w", err)
+	}
+	view := settings.ToView()
+	return &view, nil
+}
+
+// TestClientDetect is the resolver for the testClientDetect field.
+func (r *queryResolver) TestClientDetect(ctx context.Context, userAgent *string, clientHeader *string, clientVersionHeader *string) (*biz.ClientDetectResult, error) {
+	settings := r.systemService.ClientCompatSettingsOrDefault(ctx)
+	headers := map[string][]string{}
+	if userAgent != nil && *userAgent != "" {
+		headers["User-Agent"] = []string{*userAgent}
+	}
+	explicit := settings.Detection.ExplicitHeader
+	if explicit == "" {
+		explicit = biz.DefaultClientHeader
+	}
+	versionH := settings.Detection.ExplicitVersionHeader
+	if versionH == "" {
+		versionH = biz.DefaultClientVersionHeader
+	}
+	if clientHeader != nil && *clientHeader != "" {
+		headers[explicit] = []string{*clientHeader}
+	}
+	if clientVersionHeader != nil && *clientVersionHeader != "" {
+		headers[versionH] = []string{*clientVersionHeader}
+	}
+	result := biz.DetectClient(settings, headers)
+	return &result, nil
+}
+
+// CompareClientSchema is the resolver for the compareClientSchema field.
+func (r *queryResolver) CompareClientSchema(ctx context.Context, templateID string, document string) (*biz.ClientSchemaCompareResult, error) {
+	settings := r.systemService.ClientCompatSettingsOrDefault(ctx)
+	tpl, ok := settings.Templates[templateID]
+	if !ok {
+		// Fall back to built-in defaults.
+		def := biz.DefaultClientCompatSettings()
+		tpl, ok = def.Templates[templateID]
+		if !ok {
+			return nil, fmt.Errorf("unknown template id: %s", templateID)
+		}
+	}
+	result, err := biz.CompareJSONAgainstTemplate([]byte(document), tpl)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // GetCacheDiagnostics is the resolver for the getCacheDiagnostics field.

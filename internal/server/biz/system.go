@@ -119,6 +119,8 @@ const (
 	// SystemKeySecuritySettings is the key used to store security settings.
 	// The value is JSON-encoded SecuritySettings struct.
 	SystemKeySecuritySettings = "security_settings"
+
+	// SystemKeyClientCompat is defined in client_compat.go (system_client_compat).
 )
 
 // SystemGeneralSettings represents general system configuration settings.

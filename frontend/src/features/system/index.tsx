@@ -6,7 +6,18 @@ import { Main } from '@/components/layout/main';
 import { SystemSettingsTabs } from './components/tabs';
 import SystemProvider from './context/system-context';
 
-type SystemTabKey = 'brand' | 'security' | 'storage' | 'retry' | 'webhook' | 'about' | 'general' | 'proxy' | 'backup' | 'diagnostics';
+type SystemTabKey =
+  | 'brand'
+  | 'security'
+  | 'storage'
+  | 'retry'
+  | 'webhook'
+  | 'about'
+  | 'general'
+  | 'proxy'
+  | 'backup'
+  | 'diagnostics'
+  | 'client-compat';
 
 interface SystemContentProps {
   initialTab?: SystemTabKey;

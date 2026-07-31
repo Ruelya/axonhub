@@ -2,7 +2,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { DashboardIcon } from '@radix-ui/react-icons';
 import { zhCN, enUS } from 'date-fns/locale';
-import { Copy, Clock, Key, Database, FileText, Layers, Download, Terminal } from 'lucide-react';
+import { Copy, Clock, Key, Database, FileText, Layers, Download, Terminal, MonitorSmartphone } from 'lucide-react';
+import { clientSourceLabel, detectClientFromHeaders } from '@/features/system/data/client-detect';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { extractNumberID } from '@/lib/utils';
@@ -81,6 +82,8 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
   const isLive = isPreviewStreaming || !!(request?.status === 'processing' && request?.stream);
   const hasResponseBody = !!(request?.responseBody && Object.keys(request.responseBody).length > 0);
   const hasResponseChunks = !!(request?.responseChunks && request.responseChunks.length > 0);
+
+  const clientDetect = useMemo(() => detectClientFromHeaders(request?.requestHeaders), [request?.requestHeaders]);
 
   const extractResponseText = useCallback(() => {
     if (!request) return '';
@@ -374,6 +377,31 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                 <span className='text-xs font-medium'>{t('requests.dialogs.requestDetail.fields.apiKeyName')}</span>
               </div>
               <p className='text-muted-foreground font-mono text-xs'>{request.apiKey?.name || t('requests.columns.unknown')}</p>
+            </div>
+
+            <div className='bg-muted/30 flex items-center justify-between gap-2 rounded-lg border px-3 py-2'>
+              <div className='flex items-center gap-2'>
+                <MonitorSmartphone className='text-primary h-3.5 w-3.5' />
+                <span className='text-xs font-medium'>{t('requests.client.label')}</span>
+              </div>
+              <div className='flex flex-wrap items-center justify-end gap-1'>
+                <Badge
+                  variant={clientDetect.profileId === 'unknown' ? 'outline' : 'secondary'}
+                  className='font-mono text-[11px]'
+                >
+                  {clientDetect.displayName || t('requests.client.unknown')}
+                </Badge>
+                {clientDetect.source !== 'none' && (
+                  <span className='text-muted-foreground text-[10px]'>
+                    {t('requests.client.via', {
+                      source:
+                        clientDetect.source === 'explicit'
+                          ? clientSourceLabel('explicit')
+                          : clientSourceLabel('user_agent'),
+                    })}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
