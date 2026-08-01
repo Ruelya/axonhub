@@ -66,7 +66,7 @@ type Request struct {
 	ClientProfile string `json:"client_profile,omitempty"`
 	// How the client was identified: explicit, user_agent, or none
 	ClientDetectSource string `json:"client_detect_source,omitempty"`
-	// Whether AxonHub applied client-compat response patches on the wire
+	// Whether AxonHub actually modified request/response bodies for client compat
 	ClientCompatApplied bool `json:"client_compat_applied,omitempty"`
 	// MetricsLatencyMs holds the value of the "metrics_latency_ms" field.
 	MetricsLatencyMs *int64 `json:"metrics_latency_ms,omitempty"`
