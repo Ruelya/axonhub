@@ -92,8 +92,13 @@ type ClientProfileConfig struct {
 
 // ClientPatchConfig lists known response wire patches.
 type ClientPatchConfig struct {
-	// EnsureOutputTextAnnotations fills missing/null annotations on output_text parts with [].
+	// EnsureOutputTextAnnotations enables wire patches for this profile.
+	// Historically only filled output_text.annotations; now activates the full
+	// Grok-strict Responses suite (annotations + message id/status/role + strip empty conversation).
 	EnsureOutputTextAnnotations bool `json:"ensureOutputTextAnnotations"`
+	// EnsureStrictResponsesOutput is an explicit alias for the full suite.
+	// Either flag being true activates NormalizeResponsesJSON.
+	EnsureStrictResponsesOutput bool `json:"ensureStrictResponsesOutput,omitempty"`
 }
 
 // ClientTemplate describes expected API shape for a client (schema subset).
@@ -303,7 +308,9 @@ func defaultClientProfiles() map[string]ClientProfileConfig {
 			Enabled:     false,
 			TemplateID:  TemplateGrokBuildResponsesV1,
 			Patches: ClientPatchConfig{
-				EnsureOutputTextAnnotations: true, // preferred patch when profile is enabled; profile itself defaults off
+				// Preferred patches when profile is enabled; profile itself defaults off.
+				EnsureOutputTextAnnotations: true,
+				EnsureStrictResponsesOutput: true,
 			},
 		},
 		ClientProfileCodex: {
@@ -548,6 +555,8 @@ func (s *SystemService) ApplyClientCompatUpdate(ctx context.Context, input Clien
 		}
 		if p.EnsureOutputTextAnnotations != nil {
 			existing.Patches.EnsureOutputTextAnnotations = *p.EnsureOutputTextAnnotations
+			// UI single switch: enabling annotations enables the full strict suite.
+			existing.Patches.EnsureStrictResponsesOutput = *p.EnsureOutputTextAnnotations
 		}
 		current.Profiles[id] = existing
 	}
@@ -718,7 +727,7 @@ func ShouldPatchResponse(settings *ClientCompatSettings, detect *ClientDetectRes
 	if !ok || !profile.Enabled {
 		return false
 	}
-	return profile.Patches.EnsureOutputTextAnnotations
+	return profile.Patches.AnyActive()
 }
 
 // ActivePatches returns the patch config for the detected profile when patching is active.
@@ -726,5 +735,10 @@ func ActivePatches(settings *ClientCompatSettings, detect *ClientDetectResult) (
 	if !ShouldPatchResponse(settings, detect) {
 		return ClientPatchConfig{}, false
 	}
-	return settings.Profiles[detect.ProfileID].Patches, true
+	p := settings.Profiles[detect.ProfileID].Patches
+	// Migrate legacy settings: annotations-only → full suite.
+	if p.EnsureOutputTextAnnotations && !p.EnsureStrictResponsesOutput {
+		p.EnsureStrictResponsesOutput = true
+	}
+	return p, true
 }

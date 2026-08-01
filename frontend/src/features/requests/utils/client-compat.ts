@@ -65,26 +65,88 @@ function cloneJSON<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function ensureAnnotationsInValue(value: unknown): boolean {
+function hasNonEmptyString(obj: Record<string, unknown>, key: string): boolean {
+  const v = obj[key];
+  return typeof v === 'string' && v.trim() !== '';
+}
+
+function firstOutputText(msg: Record<string, unknown>): string {
+  const content = msg.content;
+  if (!Array.isArray(content)) return '';
+  for (const c of content) {
+    if (c && typeof c === 'object') {
+      const m = c as Record<string, unknown>;
+      if (m.type === 'output_text' && typeof m.text === 'string') {
+        return m.text.slice(0, 64);
+      }
+    }
+  }
+  return '';
+}
+
+/** Stable synthetic id (preview only; backend may backfill from stream hints). */
+function syntheticMessageId(index: number, msg: Record<string, unknown>): string {
+  const role = typeof msg.role === 'string' ? msg.role : '';
+  const text = firstOutputText(msg);
+  // Lightweight non-crypto hash for UI preview stability.
+  let h = 0;
+  const s = `${index}|${role}|${text}`;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return `msg_${(h >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+function shouldStripConversation(conv: unknown): boolean {
+  if (!conv || typeof conv !== 'object' || Array.isArray(conv)) return true;
+  return !hasNonEmptyString(conv as Record<string, unknown>, 'id');
+}
+
+/**
+ * Mirror backend NormalizeResponsesJSON for dry-run diffs:
+ * annotations, message id/status/role, strip empty conversation.
+ */
+function normalizeResponsesValue(value: unknown, msgIndex: { n: number }): boolean {
   if (value === null || value === undefined) return false;
   if (Array.isArray(value)) {
     let changed = false;
     for (const item of value) {
-      if (ensureAnnotationsInValue(item)) changed = true;
+      if (normalizeResponsesValue(item, msgIndex)) changed = true;
     }
     return changed;
   }
   if (typeof value === 'object') {
     const obj = value as Record<string, unknown>;
     let changed = false;
+
+    if ('conversation' in obj && shouldStripConversation(obj.conversation)) {
+      delete obj.conversation;
+      changed = true;
+    }
+
     if (obj.type === 'output_text') {
       if (!('annotations' in obj) || obj.annotations === null || obj.annotations === undefined) {
         obj.annotations = [];
         changed = true;
       }
     }
+
+    if (obj.type === 'message') {
+      const idx = msgIndex.n++;
+      if (!hasNonEmptyString(obj, 'id')) {
+        obj.id = syntheticMessageId(idx, obj);
+        changed = true;
+      }
+      if (!hasNonEmptyString(obj, 'status')) {
+        obj.status = 'completed';
+        changed = true;
+      }
+      if (!hasNonEmptyString(obj, 'role')) {
+        obj.role = 'assistant';
+        changed = true;
+      }
+    }
+
     for (const child of Object.values(obj)) {
-      if (ensureAnnotationsInValue(child)) changed = true;
+      if (normalizeResponsesValue(child, msgIndex)) changed = true;
     }
     return changed;
   }
@@ -92,7 +154,7 @@ function ensureAnnotationsInValue(value: unknown): boolean {
 }
 
 /**
- * Apply the same wire patch as backend EnsureOutputTextAnnotations.
+ * Apply the same wire patch as backend NormalizeResponsesJSON (Grok-strict suite).
  * Returns { original, patched, changed }.
  */
 export function previewAnnotationsPatch(responseBody: unknown): {
@@ -105,7 +167,7 @@ export function previewAnnotationsPatch(responseBody: unknown): {
   }
   const original = responseBody;
   const patched = cloneJSON(responseBody);
-  const changed = ensureAnnotationsInValue(patched);
+  const changed = normalizeResponsesValue(patched, { n: 0 });
   return { original, patched, changed };
 }
 

@@ -435,8 +435,8 @@
   "system.clientCompat.profiles.description": "当前仅 Grok Build 支持补全；其他客户端仅识别并展示。",
   "system.clientCompat.profiles.detectOnly": "仅识别",
   "system.clientCompat.profiles.enablePatch": "启用补全",
-  "system.clientCompat.profiles.grokHelp": "为 output_text 补全缺失的 annotations 字段（空数组）。",
+  "system.clientCompat.profiles.grokHelp": "规范化 response.completed 等出站字段，满足 Grok Build 严格 schema。",
   "system.clientCompat.profiles.template": "模板",
-  "system.clientCompat.patches.annotations": "补全 annotations",
-  "system.clientCompat.patches.annotationsHelp": "缺失或 null 时写入 []；已有值不修改。"
+  "system.clientCompat.patches.annotations": "严格 Responses 规范化",
+  "system.clientCompat.patches.annotationsHelp": "补全 output_text.annotations、message 的 id/status/role，并移除无 id 的 conversation。"
 }

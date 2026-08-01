@@ -435,8 +435,8 @@
   "system.clientCompat.profiles.description": "Only Grok Build supports patches today; other clients are detect-only.",
   "system.clientCompat.profiles.detectOnly": "Detect only",
   "system.clientCompat.profiles.enablePatch": "Enable patch",
-  "system.clientCompat.profiles.grokHelp": "Fill missing output_text.annotations with an empty array.",
+  "system.clientCompat.profiles.grokHelp": "Normalize outbound Responses fields for Grok Build strict schema (completed and related events).",
   "system.clientCompat.profiles.template": "Template",
-  "system.clientCompat.patches.annotations": "Ensure annotations",
-  "system.clientCompat.patches.annotationsHelp": "Write [] when missing or null; leave existing values unchanged."
+  "system.clientCompat.patches.annotations": "Strict Responses normalization",
+  "system.clientCompat.patches.annotationsHelp": "Fill output_text.annotations, message id/status/role, and strip conversation without id."
 }

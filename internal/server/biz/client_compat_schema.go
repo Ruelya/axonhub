@@ -103,12 +103,12 @@ func CompareJSONAgainstTemplate(data []byte, template ClientTemplate) (*ClientSc
 }
 
 // ApplySelectedPatches applies optional fill rules chosen by the UI (dry-run or real).
-// Currently supports ensuring output_text.annotations.
+// When enabled, runs the full Grok-strict Responses suite (not annotations alone).
 func ApplySelectedPatches(data []byte, ensureAnnotations bool) ([]byte, bool) {
 	if !ensureAnnotations {
 		return data, false
 	}
-	return EnsureOutputTextAnnotations(data)
+	return NormalizeResponsesJSON(data, nil)
 }
 
 func walkOutputText(v any, path string, fn func(path string, obj map[string]any)) {
