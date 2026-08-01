@@ -250,28 +250,26 @@ export function useRequestsColumns(options?: UseRequestsColumnsOptions): ColumnD
       enableSorting: false,
       cell: ({ row }) => {
         const compat = resolveCompatDisplay(row.original);
-        const label =
-          compat.profileId === 'unknown' || !compat.profileId
-            ? t('requests.client.unknown')
-            : compat.displayName;
+        const unknown = compat.profileId === 'unknown' || !compat.profileId;
+        const label = unknown ? t('requests.client.unknown') : compat.displayName;
+        const badgeClass = compat.applied
+          ? 'cursor-default border-red-200 bg-red-50 font-medium text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300'
+          : unknown
+            ? 'cursor-default font-medium'
+            : 'cursor-default border-emerald-200 bg-emerald-50 font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300';
         return (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge
-                variant='secondary'
-                className={
-                  compat.applied
-                    ? 'cursor-default border-red-200 bg-red-50 font-medium text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300'
-                    : 'cursor-default border-emerald-200 bg-emerald-50 font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-                }
-              >
+              <Badge variant='secondary' className={badgeClass}>
                 {label}
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
               {compat.applied
                 ? t('requests.client.compat.appliedTooltip')
-                : t('requests.client.compat.normalTooltip')}
+                : unknown
+                  ? t('requests.client.unknown')
+                  : t('requests.client.compat.normalTooltip')}
             </TooltipContent>
           </Tooltip>
         );

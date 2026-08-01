@@ -171,6 +171,82 @@ export function previewAnnotationsPatch(responseBody: unknown): {
   return { original, patched, changed };
 }
 
+/**
+ * Build a before/after pair for request-body compat display.
+ * Prefer real outbound body from request execution when it differs from inbound.
+ * Fall back to dry-run prompt_cache_key inject from session header.
+ */
+export function previewRequestBodyPatch(args: {
+  inboundBody: unknown;
+  outboundBody?: unknown | null;
+  requestHeaders?: unknown;
+}): { original: unknown; patched: unknown; changed: boolean; source: 'execution' | 'preview' | 'none' } {
+  const { inboundBody, outboundBody, requestHeaders } = args;
+  if (inboundBody === null || inboundBody === undefined) {
+    return { original: inboundBody, patched: inboundBody, changed: false, source: 'none' };
+  }
+
+  // Prefer real outbound execution body when it differs.
+  if (outboundBody !== null && outboundBody !== undefined) {
+    try {
+      const a = JSON.stringify(inboundBody);
+      const b = JSON.stringify(outboundBody);
+      if (a !== b) {
+        return { original: inboundBody, patched: outboundBody, changed: true, source: 'execution' };
+      }
+    } catch {
+      // fall through to dry-run
+    }
+  }
+
+  // Dry-run: inject prompt_cache_key from X-Grok-Session-Id when missing.
+  const sessionId = extractGrokSessionId(requestHeaders);
+  if (!sessionId || typeof inboundBody !== 'object' || Array.isArray(inboundBody)) {
+    return { original: inboundBody, patched: inboundBody, changed: false, source: 'none' };
+  }
+  const obj = inboundBody as Record<string, unknown>;
+  const existing = obj.prompt_cache_key;
+  if (typeof existing === 'string' && existing.trim() !== '') {
+    return { original: inboundBody, patched: inboundBody, changed: false, source: 'none' };
+  }
+  const patched = cloneJSON(inboundBody) as Record<string, unknown>;
+  patched.prompt_cache_key = sessionId;
+  return { original: inboundBody, patched, changed: true, source: 'preview' };
+}
+
+function extractGrokSessionId(headers: unknown): string {
+  if (!headers || typeof headers !== 'object') return '';
+  const h = headers as Record<string, unknown>;
+  const get = (...keys: string[]): string => {
+    for (const k of keys) {
+      const v = h[k] ?? h[k.toLowerCase()] ?? h[k.toUpperCase()];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+      if (Array.isArray(v) && typeof v[0] === 'string' && v[0].trim()) return v[0].trim();
+    }
+    return '';
+  };
+  for (const id of [
+    get('X-Grok-Session-Id', 'x-grok-session-id'),
+    get('X-Grok-Conv-Id', 'x-grok-conv-id'),
+    get('Session-Id', 'session-id', 'Session_id'),
+  ]) {
+    if (!id) continue;
+    if (id.toLowerCase().startsWith('recap-')) continue;
+    return id;
+  }
+  return '';
+}
+
+/** Generic before/after pair for unified diff display. */
+export function bodyPairDiff(
+  original: unknown,
+  patched: unknown
+): { beforeText: string; afterText: string; changed: boolean } {
+  const beforeText = formatJSON(original);
+  const afterText = formatJSON(patched);
+  return { beforeText, afterText, changed: beforeText !== afterText };
+}
+
 export type SchemaDiff = {
   templateId: string;
   templateName: string;

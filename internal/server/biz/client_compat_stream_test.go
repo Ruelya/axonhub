@@ -94,6 +94,33 @@ func TestWrapClientCompatStream_InactiveNoop(t *testing.T) {
 	require.Same(t, inner, wrapped)
 }
 
+func TestWrapClientCompatStream_OnChangedOnlyWhenModified(t *testing.T) {
+	// Already-normalized payload: no field changes expected.
+	clean := []byte(`{"type":"response.completed","response":{"id":"resp_x","object":"response","output":[{"type":"message","id":"item_1","role":"assistant","status":"completed","content":[{"type":"output_text","text":"hi","annotations":[]}]}],"status":"completed"}}`)
+	// Thin payload that needs annotations.
+	thin := []byte(`{"type":"response.completed","response":{"id":"resp_x","object":"response","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hi"}]}],"status":"completed"}}`)
+
+	patches := ClientPatchConfig{EnsureOutputTextAnnotations: true, EnsureStrictResponsesOutput: true}
+
+	nClean := 0
+	w1 := WrapClientCompatStreamWithNotify(&fakeCompatStream{events: []*httpclient.StreamEvent{
+		{Type: "response.completed", Data: clean},
+	}}, patches, true, func() { nClean++ })
+	require.True(t, w1.Next())
+	assert.Equal(t, 0, nClean)
+	assert.False(t, ClientCompatStreamChanged(w1))
+
+	nThin := 0
+	w2 := WrapClientCompatStreamWithNotify(&fakeCompatStream{events: []*httpclient.StreamEvent{
+		{Type: "response.completed", Data: thin},
+		{Type: "response.completed", Data: append([]byte(nil), thin...)},
+	}}, patches, true, func() { nThin++ })
+	require.True(t, w2.Next())
+	require.True(t, w2.Next())
+	assert.Equal(t, 1, nThin, "onChanged should fire only once")
+	assert.True(t, ClientCompatStreamChanged(w2))
+}
+
 func TestNormalizeResponsesJSON_LiveSkinnyCompleted(t *testing.T) {
 	// Exact shape from root-cause writeup / live SSE.
 	input := []byte(`{

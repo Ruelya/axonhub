@@ -283,19 +283,41 @@ type streamItemHint struct {
 
 // clientCompatStream wraps an upstream stream and patches events for the client wire.
 type clientCompatStream struct {
-	inner         streams.Stream[*httpclient.StreamEvent]
-	patches       ClientPatchConfig
-	current       *httpclient.StreamEvent
-	messageHints  []streamItemHint
+	inner        streams.Stream[*httpclient.StreamEvent]
+	patches      ClientPatchConfig
+	current      *httpclient.StreamEvent
+	messageHints []streamItemHint
+	changed      bool
+	onChanged    func()
 }
 
 // WrapClientCompatStream returns a stream that applies patches on Current().
 // If patches are inactive, the original stream is returned unchanged.
 func WrapClientCompatStream(inner streams.Stream[*httpclient.StreamEvent], patches ClientPatchConfig, active bool) streams.Stream[*httpclient.StreamEvent] {
+	return WrapClientCompatStreamWithNotify(inner, patches, active, nil)
+}
+
+// WrapClientCompatStreamWithNotify is like WrapClientCompatStream but invokes onChanged
+// once when any event body is actually modified (for request-log applied flag).
+func WrapClientCompatStreamWithNotify(
+	inner streams.Stream[*httpclient.StreamEvent],
+	patches ClientPatchConfig,
+	active bool,
+	onChanged func(),
+) streams.Stream[*httpclient.StreamEvent] {
 	if inner == nil || !active || !patches.AnyActive() {
 		return inner
 	}
-	return &clientCompatStream{inner: inner, patches: patches}
+	return &clientCompatStream{inner: inner, patches: patches, onChanged: onChanged}
+}
+
+// ClientCompatStreamChanged reports whether a wrapped stream mutated any event.
+// Non-wrapped streams return false.
+func ClientCompatStreamChanged(s streams.Stream[*httpclient.StreamEvent]) bool {
+	if cs, ok := s.(*clientCompatStream); ok {
+		return cs.changed
+	}
+	return false
 }
 
 func (s *clientCompatStream) Next() bool {
@@ -334,6 +356,13 @@ func (s *clientCompatStream) Next() bool {
 		}
 		if patched, ok := PatchStreamEventDataWithOpts(cp.Data, s.patches, opts); ok {
 			cp.Data = patched
+			if !s.changed {
+				s.changed = true
+				if s.onChanged != nil {
+					s.onChanged()
+					s.onChanged = nil
+				}
+			}
 		}
 	}
 	s.current = &cp

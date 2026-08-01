@@ -81,4 +81,8 @@ type PersistenceState struct {
 
 	// PassThroughApplied records whether the inbound request body was substituted during pass-through.
 	PassThroughApplied bool
+
+	// ClientCompatApplied is true when a client-compat request or response body was
+	// actually modified (for request-log UI: red badge only when real patches land).
+	ClientCompatApplied bool
 }

@@ -4,7 +4,8 @@ import { DashboardIcon } from '@radix-ui/react-icons';
 import { zhCN, enUS } from 'date-fns/locale';
 import { Copy, Clock, Key, Database, FileText, Layers, Download, Terminal, MonitorSmartphone } from 'lucide-react';
 import { clientSourceLabel } from '@/features/system/data/client-detect';
-import { resolveCompatDisplay } from '../utils/client-compat';
+import { previewRequestBodyPatch, resolveCompatDisplay } from '../utils/client-compat';
+import { BodyCompatDiff } from './body-compat-diff';
 import { ResponseCompatDiff } from './response-compat-diff';
 import { SchemaComparePanel } from './schema-compare-panel';
 import { useTranslation } from 'react-i18next';
@@ -95,6 +96,22 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
         requestHeaders: request?.requestHeaders,
       }),
     [request?.clientProfile, request?.clientDetectSource, request?.clientCompatApplied, request?.requestHeaders]
+  );
+
+  const latestExecutionRequestBody = useMemo(() => {
+    const edges = executions?.edges;
+    if (!edges || edges.length === 0) return null;
+    return edges[0]?.node?.requestBody ?? null;
+  }, [executions?.edges]);
+
+  const requestBodyCompat = useMemo(
+    () =>
+      previewRequestBodyPatch({
+        inboundBody: request?.requestBody,
+        outboundBody: latestExecutionRequestBody,
+        requestHeaders: request?.requestHeaders,
+      }),
+    [request?.requestBody, request?.requestHeaders, latestExecutionRequestBody]
   );
 
   const extractResponseText = useCallback(() => {
@@ -402,7 +419,9 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                   className={
                     clientCompat.applied
                       ? 'border-red-200 bg-red-50 font-mono text-[11px] text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300'
-                      : 'border-emerald-200 bg-emerald-50 font-mono text-[11px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                      : clientCompat.profileId && clientCompat.profileId !== 'unknown'
+                        ? 'border-emerald-200 bg-emerald-50 font-mono text-[11px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : 'font-mono text-[11px]'
                   }
                 >
                   {clientCompat.displayName || t('requests.client.unknown')}
@@ -603,6 +622,29 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                     </Button>
                   </div>
                 </div>
+                {(requestBodyCompat.source === 'execution' ||
+                  (clientCompat.applied && requestBodyCompat.changed)) && (
+                  <div className='space-y-2'>
+                    <h5 className='text-muted-foreground text-sm font-medium'>
+                      {t('requests.client.compat.requestDiffTitle')}
+                    </h5>
+                    <BodyCompatDiff
+                      original={requestBodyCompat.original}
+                      patched={requestBodyCompat.patched}
+                      changed={requestBodyCompat.changed}
+                      compat={{
+                        ...clientCompat,
+                        applied: requestBodyCompat.changed || clientCompat.applied,
+                      }}
+                      sourceLabel={
+                        requestBodyCompat.source === 'execution'
+                          ? t('requests.client.compat.requestDiffFromExecution')
+                          : t('requests.client.compat.requestDiffPreview')
+                      }
+                      copySuccessLabel={t('requests.client.compat.copyPatchedRequestSuccess')}
+                    />
+                  </div>
+                )}
                 <div className='bg-muted/20 h-[500px] w-full overflow-auto rounded-lg border p-4'>
                   <JsonViewer data={request.requestBody} rootName='' defaultExpanded={true} expandDepth='all' hideArrayIndices={true} className='text-sm' />
                 </div>
@@ -618,12 +660,8 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                 />
               )}
 
-              {clientCompat.applied && hasResponseBody && (
+              {hasResponseBody && (
                 <div className='space-y-3'>
-                  <h4 className='flex items-center gap-2 text-base font-semibold'>
-                    <FileText className='text-primary h-4 w-4' />
-                    {t('requests.client.compat.responseDiffTitle')}
-                  </h4>
                   <ResponseCompatDiff
                     responseBody={request.responseBody}
                     compat={clientCompat}
@@ -935,9 +973,31 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                                   </Button>
                                 </div>
                               </div>
-                              <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>
-                                <JsonViewer data={execution.requestBody} rootName='' defaultExpanded={false} hideArrayIndices={true} className='text-xs' />
-                              </div>
+                              {(() => {
+                                const execReqDiff = previewRequestBodyPatch({
+                                  inboundBody: request?.requestBody,
+                                  outboundBody: execution.requestBody,
+                                  requestHeaders: request?.requestHeaders,
+                                });
+                                if (!execReqDiff.changed) {
+                                  return (
+                                    <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>
+                                      <JsonViewer data={execution.requestBody} rootName='' defaultExpanded={false} hideArrayIndices={true} className='text-xs' />
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <BodyCompatDiff
+                                    original={execReqDiff.original}
+                                    patched={execReqDiff.patched}
+                                    changed={execReqDiff.changed}
+                                    compat={{ ...clientCompat, applied: true }}
+                                    compact
+                                    sourceLabel={t('requests.client.compat.requestDiffFromExecution')}
+                                    copySuccessLabel={t('requests.client.compat.copyPatchedRequestSuccess')}
+                                  />
+                                );
+                              })()}
                             </div>
                           )}
 

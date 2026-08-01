@@ -104,10 +104,11 @@ func (Request) Fields() []ent.Field {
 			Optional().
 			Default("").
 			Comment("How the client was identified: explicit, user_agent, or none"),
-		// Whether client-compat response wire patches were applied for this request.
+		// Whether client-compat actually modified request and/or response bodies for this request.
+		// Detect-only (green) requests stay false; true only when a real patch landed (red in UI).
 		field.Bool("client_compat_applied").
 			Default(false).
-			Comment("Whether AxonHub applied client-compat response patches on the wire"),
+			Comment("Whether AxonHub actually modified request/response bodies for client compat"),
 		// Total latency in milliseconds from request start to completion
 		field.Int64("metrics_latency_ms").Optional().Nillable(),
 		// First token latency in milliseconds (only for streaming requests)

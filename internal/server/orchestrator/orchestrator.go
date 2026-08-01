@@ -10,6 +10,7 @@ import (
 	"github.com/looplj/axonhub/internal/metrics"
 	"github.com/looplj/axonhub/internal/pkg/xcontext"
 	"github.com/looplj/axonhub/internal/server/biz"
+	"github.com/looplj/axonhub/llm"
 	"github.com/looplj/axonhub/llm/httpclient"
 	"github.com/looplj/axonhub/llm/pipeline"
 	"github.com/looplj/axonhub/llm/pipeline/cc"
@@ -278,6 +279,8 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 		// applyPassThroughBody runs first so that override operations can still modify the pass-through body.
 		applyPassThroughRequestBody(outbound, processor.SystemService),
 		applyOverrideRequestBody(outbound),
+		// Grok Build → non-xAI Responses: inject prompt_cache_key on the final outbound body.
+		applyGrokClientRequestCompat(outbound, processor.SystemService),
 		// applyUserAgentPassThrough runs before header overrides to set the initial
 		// User-Agent value (either from client pass-through or default "axonhub/1.0").
 		// This allows override headers to modify the User-Agent if configured.
@@ -350,16 +353,37 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 		return ChatCompletionResult{}, err
 	}
 
-	// Apply client-wire compatibility patches after the pipeline so both pass-through
-	// and transformed paths are covered. Persistence still keeps the raw upstream body.
-	patches, patchActive := biz.ActivePatches(clientCompat, &clientDetect)
+	// Client-compat response wire patches (route-aware).
+	// Persistence still keeps the raw upstream body; only the client-facing wire is patched.
+	// client_compat_applied is set only when a request or response body is actually modified.
+	channelType := ""
+	if ch := outbound.GetCurrentChannel(); ch != nil {
+		channelType = ch.Type.String()
+	}
+	inboundFormat := llm.APIFormat("")
+	if outbound.state != nil && outbound.state.LlmRequest != nil {
+		inboundFormat = outbound.state.LlmRequest.APIFormat
+	}
+	route := biz.DecideClientRoute(clientCompat, &clientDetect, channelType, inboundFormat)
+	patches := route.ResponsePatches
+	patchActive := route.ResponsePatchActive
 
-	// Persist whether this request engaged client-compat wire patching (for request log UI).
-	if patchActive {
+	// Request-side inject may already have marked applied during the pipeline.
+	requestAlreadyMarked := outbound.state != nil && outbound.state.ClientCompatApplied
+
+	markCompatApplied := func() {
+		if requestAlreadyMarked {
+			return
+		}
 		if req := outbound.GetRequest(); req != nil {
 			persistCtx, cancel := xcontext.DetachWithTimeout(ctx, time.Second*5)
 			if err := processor.RequestService.UpdateRequestClientCompatApplied(persistCtx, req.ID, true); err != nil {
 				log.Warn(persistCtx, "Failed to mark client_compat_applied", log.Cause(err))
+			} else {
+				requestAlreadyMarked = true
+				if outbound.state != nil {
+					outbound.state.ClientCompatApplied = true
+				}
 			}
 			cancel()
 		}
@@ -369,9 +393,10 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 	if result.Stream {
 		stream := result.EventStream
 		if patchActive {
-			stream = biz.WrapClientCompatStream(stream, patches, true)
+			stream = biz.WrapClientCompatStreamWithNotify(stream, patches, true, markCompatApplied)
 			log.Debug(ctx, "client compat stream patch enabled",
 				log.String("profile", clientDetect.ProfileID),
+				log.String("route", route.Reason),
 				log.Bool("ensure_output_text_annotations", patches.EnsureOutputTextAnnotations),
 			)
 		}
@@ -388,8 +413,10 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 			cp := *resp
 			cp.Body = patched
 			resp = &cp
+			markCompatApplied()
 			log.Debug(ctx, "client compat response body patch applied",
 				log.String("profile", clientDetect.ProfileID),
+				log.String("route", route.Reason),
 			)
 		}
 	}
