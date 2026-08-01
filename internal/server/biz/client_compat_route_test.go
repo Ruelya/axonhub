@@ -66,7 +66,7 @@ func TestInjectPromptCacheKeyJSON(t *testing.T) {
 	require.True(t, ok)
 	require.Contains(t, string(out), `"prompt_cache_key":"sess-123"`)
 
-	// Already present — no change
+	// Client-provided non-auto key — leave alone
 	out2, ok2 := InjectPromptCacheKeyJSON(out, "other")
 	assert.False(t, ok2)
 	assert.Equal(t, string(out), string(out2))
@@ -74,6 +74,20 @@ func TestInjectPromptCacheKeyJSON(t *testing.T) {
 	// Empty key
 	_, ok3 := InjectPromptCacheKeyJSON(body, "")
 	assert.False(t, ok3)
+
+	// Replace AxonHub auto key (at-…-anchor) with Grok session id
+	auto := []byte(`{"model":"x","prompt_cache_key":"at-e999c3b3-997b-4060-aeb5-58cb37385a1f-5c38cb53722ffb11"}`)
+	out4, ok4 := InjectPromptCacheKeyJSON(auto, "019fbce5-9e2d-7391-9507-64b1cb5f24db")
+	require.True(t, ok4)
+	require.Contains(t, string(out4), `"prompt_cache_key":"019fbce5-9e2d-7391-9507-64b1cb5f24db"`)
+	require.NotContains(t, string(out4), `"at-`)
+}
+
+func TestIsAxonHubAutoPromptCacheKey(t *testing.T) {
+	assert.True(t, IsAxonHubAutoPromptCacheKey("at-e999c3b3-997b-4060-aeb5-58cb37385a1f"))
+	assert.True(t, IsAxonHubAutoPromptCacheKey("at-e999c3b3-997b-4060-aeb5-58cb37385a1f-5c38cb53722ffb11"))
+	assert.False(t, IsAxonHubAutoPromptCacheKey("019fbce5-9e2d-7391-9507-64b1cb5f24db"))
+	assert.False(t, IsAxonHubAutoPromptCacheKey(""))
 }
 
 func TestGrokSessionIDFromHeaders(t *testing.T) {

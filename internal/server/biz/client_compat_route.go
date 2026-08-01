@@ -184,7 +184,22 @@ func GrokSessionIDFromHeaderMap(headers map[string]any) string {
 	return ""
 }
 
-// InjectPromptCacheKeyJSON sets prompt_cache_key on a JSON request body when missing/empty.
+// IsAxonHubAutoPromptCacheKey reports whether key looks like AxonHub's fallback
+// (AH-Trace-Id "at-<uuid>" or "at-<uuid>-<anchor>"), not a client session id.
+func IsAxonHubAutoPromptCacheKey(key string) bool {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return false
+	}
+	// GenerateTraceID format: at-{{uuid}} optionally + "-" + conversation anchor.
+	return strings.HasPrefix(strings.ToLower(key), "at-")
+}
+
+// InjectPromptCacheKeyJSON sets prompt_cache_key on a JSON request body.
+// - If missing/empty → set to key.
+// - If existing is an AxonHub auto key (at-…) → replace with key.
+// - If existing already equals key → no change.
+// - If existing is another non-empty client key → leave as-is (respect client/recap).
 // Returns (body, true) when the body was modified.
 func InjectPromptCacheKeyJSON(body []byte, key string) ([]byte, bool) {
 	key = strings.TrimSpace(key)
@@ -192,14 +207,16 @@ func InjectPromptCacheKeyJSON(body []byte, key string) ([]byte, bool) {
 		return body, false
 	}
 	trim := strings.TrimSpace(string(body))
-	if trim == "" || (trim[0] != '{' && trim[0] != '[') {
+	if trim == "" || trim[0] != '{' {
 		return body, false
 	}
-	// Only object roots are valid Responses/chat request bodies for this field.
-	if trim[0] != '{' {
+	existing := strings.TrimSpace(gjson.GetBytes(body, "prompt_cache_key").String())
+	if existing == key {
 		return body, false
 	}
-	if existing := strings.TrimSpace(gjson.GetBytes(body, "prompt_cache_key").String()); existing != "" {
+	// Respect an explicit client-provided key (e.g. recap already set session id),
+	// but always overwrite AxonHub auto keys so Grok session id wins.
+	if existing != "" && !IsAxonHubAutoPromptCacheKey(existing) {
 		return body, false
 	}
 	out, err := sjson.SetBytes(body, "prompt_cache_key", key)
@@ -217,4 +234,10 @@ func PreviewPromptCacheKeyPatch(body []byte, key string) (patched []byte, change
 // HasPromptCacheKey reports whether body already carries a non-empty prompt_cache_key.
 func HasPromptCacheKey(body []byte) bool {
 	return strings.TrimSpace(gjson.GetBytes(body, "prompt_cache_key").String()) != ""
+}
+
+// ResolveGrokPromptCacheKey returns the stable cache key for Grok Build from headers.
+// Prefer X-Grok-Session-Id; never use AH-Trace-Id.
+func ResolveGrokPromptCacheKey(headers http.Header) string {
+	return GrokSessionIDFromHeaders(headers)
 }

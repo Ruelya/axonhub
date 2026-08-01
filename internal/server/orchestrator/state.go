@@ -86,4 +86,7 @@ type PersistenceState struct {
 	// ClientCompatApplied is true when a client-compat request or response body was
 	// actually modified (for request-log UI: red badge only when real patches land).
 	ClientCompatApplied bool
+
+	// SystemService is optional; used for route-aware client-compat decisions during outbound.
+	SystemService *biz.SystemService
 }

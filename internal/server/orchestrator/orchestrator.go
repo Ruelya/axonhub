@@ -223,6 +223,7 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 		ModelMapper:           processor.ModelMapper,
 		Proxy:                 processor.proxy,
 		CurrentCandidateIndex: 0,
+		SystemService:         processor.SystemService,
 	}
 
 	var pipelineOpts []pipeline.Option

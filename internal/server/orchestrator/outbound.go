@@ -387,6 +387,11 @@ func (p *PersistentOutboundTransformer) TransformRequest(ctx context.Context, ll
 	// Apply channel transform options to create a new request
 	llmRequest = applyTransformOptions(llmRequest, candidate.Channel.Settings)
 
+	// Grok Build → non-xAI Responses: stamp prompt_cache_key from X-Grok-Session-Id
+	// before the provider transformer builds the HTTP body, so it does not fall back
+	// to AH-Trace-Id (at-…) + conversationAnchor.
+	llmRequest = applyGrokPromptCacheKeyBeforeTransform(ctx, llmRequest, p)
+
 	// Codex freeform apply_patch (Responses type=custom) is not accepted by
 	// xAI. When the outbound channel type is xai_responses and the inbound
 	// client is OpenAI Responses/Codex, bridge custom tools to function tools

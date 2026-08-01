@@ -199,19 +199,28 @@ export function previewRequestBodyPatch(args: {
     }
   }
 
-  // Dry-run: inject prompt_cache_key from X-Grok-Session-Id when missing.
+  // Dry-run: inject / replace prompt_cache_key from X-Grok-Session-Id.
+  // Overwrite AxonHub auto keys (at-…) the same way the backend does.
   const sessionId = extractGrokSessionId(requestHeaders);
   if (!sessionId || typeof inboundBody !== 'object' || Array.isArray(inboundBody)) {
     return { original: inboundBody, patched: inboundBody, changed: false, source: 'none' };
   }
   const obj = inboundBody as Record<string, unknown>;
-  const existing = obj.prompt_cache_key;
-  if (typeof existing === 'string' && existing.trim() !== '') {
+  const existing = typeof obj.prompt_cache_key === 'string' ? obj.prompt_cache_key.trim() : '';
+  const isAuto = existing.toLowerCase().startsWith('at-');
+  if (existing && !isAuto && existing === sessionId) {
     return { original: inboundBody, patched: inboundBody, changed: false, source: 'none' };
   }
-  const patched = cloneJSON(inboundBody) as Record<string, unknown>;
-  patched.prompt_cache_key = sessionId;
-  return { original: inboundBody, patched, changed: true, source: 'preview' };
+  if (existing && !isAuto && existing !== sessionId) {
+    // Explicit client key (e.g. already set) — leave alone.
+    return { original: inboundBody, patched: inboundBody, changed: false, source: 'none' };
+  }
+  if (!existing || isAuto) {
+    const patched = cloneJSON(inboundBody) as Record<string, unknown>;
+    patched.prompt_cache_key = sessionId;
+    return { original: inboundBody, patched, changed: true, source: 'preview' };
+  }
+  return { original: inboundBody, patched: inboundBody, changed: false, source: 'none' };
 }
 
 function extractGrokSessionId(headers: unknown): string {
