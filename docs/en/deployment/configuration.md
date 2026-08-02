@@ -62,6 +62,7 @@ server:
   base_path: ""                 # Base path for API routes
   request_timeout: "30s"        # Request timeout duration
   llm_request_timeout: "600s"   # LLM request timeout duration
+  sse_keepalive_interval: "15s" # SSE comment keepalives while waiting on upstream / between events (0s disables; helps Cloudflare ~100s idle)
   trace:
     thread_header: "AH-Thread-Id" # Thread ID header name
     trace_header: "AH-Trace-Id" # Trace ID header name
@@ -79,6 +80,7 @@ server:
 - `AXONHUB_SERVER_BASE_PATH`
 - `AXONHUB_SERVER_REQUEST_TIMEOUT`
 - `AXONHUB_SERVER_LLM_REQUEST_TIMEOUT`
+- `AXONHUB_SERVER_SSE_KEEPALIVE_INTERVAL`
 - `AXONHUB_SERVER_TRACE_THREAD_HEADER`
 - `AXONHUB_SERVER_TRACE_TRACE_HEADER`
 - `AXONHUB_SERVER_TRACE_EXTRA_TRACE_HEADERS`

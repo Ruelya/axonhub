@@ -124,6 +124,8 @@ type RetryPolicy {
   retryDelayMs: Int!
   streamFirstEventTimeoutSeconds: Int!
   nonStreamResponseTimeoutSeconds: Int!
+  """SSE comment keepalives while waiting on upstream / between events (0 disables). Helps Cloudflare ~100s idle."""
+  sseKeepAliveIntervalSeconds: Int!
   loadBalancerStrategy: String!
   traceStickyMode: TraceStickyMode!
   enabled: Boolean!
@@ -158,6 +160,7 @@ input UpdateRetryPolicyInput {
   retryDelayMs: Int
   streamFirstEventTimeoutSeconds: Int
   nonStreamResponseTimeoutSeconds: Int
+  sseKeepAliveIntervalSeconds: Int
   loadBalancerStrategy: String
   traceStickyMode: TraceStickyMode
   enabled: Boolean

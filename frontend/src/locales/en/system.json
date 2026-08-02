@@ -155,6 +155,8 @@
   "system.retry.streamFirstEventTimeoutSeconds.description": "Maximum seconds to wait for the first streaming event (0-600s). Set to 0 to disable.",
   "system.retry.nonStreamResponseTimeoutSeconds.label": "Non-Stream Response Timeout",
   "system.retry.nonStreamResponseTimeoutSeconds.description": "Maximum seconds to wait for a non-streaming response to complete (0-600s). Set to 0 to disable.",
+  "system.retry.sseKeepAliveIntervalSeconds.label": "SSE Keepalive Interval",
+  "system.retry.sseKeepAliveIntervalSeconds.description": "How often to send SSE comment keepalives to the client while waiting for upstream or between stream events (0-120s). Prevents Cloudflare and other proxies from idle-closing slow streams (~100s). Recommended: 15s. Set to 0 to disable.",
   "system.retry.emptyResponseDetection.label": "Empty Response Detection",
   "system.retry.emptyResponseDetection.description": "When enabled, the system pre-reads stream events to detect empty responses (no content generated). If detected, the empty response is treated as a failed attempt for subsequent retry handling.",
   "system.retry.upstreamErrorPolicy.label": "Upstream Error Display",

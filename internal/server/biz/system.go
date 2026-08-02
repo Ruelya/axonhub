@@ -338,6 +338,11 @@ type RetryPolicy struct {
 	// NonStreamResponseTimeoutSeconds defines the timeout for non-streaming responses in seconds.
 	// Set to 0 to disable. Values above 600 seconds are clamped.
 	NonStreamResponseTimeoutSeconds int `json:"non_stream_response_timeout_seconds"`
+	// SSEKeepAliveIntervalSeconds defines how often to send SSE comment keepalives to the
+	// downstream client while waiting for upstream / between stream events.
+	// Helps prevent intermediate proxies (e.g. Cloudflare ~100s idle) from closing the connection.
+	// Set to 0 to disable. Values above 120 seconds are clamped.
+	SSEKeepAliveIntervalSeconds int `json:"sse_keepalive_interval_seconds"`
 	// LoadBalancerStrategy defines which channel load balancer strategy to use.
 	// Supported values: "adaptive", "failover", "circuit-breaker", "round-robin".
 	LoadBalancerStrategy string `json:"load_balancer_strategy"`
@@ -1145,6 +1150,15 @@ func normalizeRetryPolicy(policy *RetryPolicy) {
 	}
 	if policy.NonStreamResponseTimeoutSeconds > maxRetryResponseTimeoutSeconds {
 		policy.NonStreamResponseTimeoutSeconds = maxRetryResponseTimeoutSeconds
+	}
+
+	if policy.SSEKeepAliveIntervalSeconds < 0 {
+		policy.SSEKeepAliveIntervalSeconds = 0
+	}
+	// Keep well under typical Cloudflare idle limits while avoiding chatty writes.
+	const maxSSEKeepAliveIntervalSeconds = 120
+	if policy.SSEKeepAliveIntervalSeconds > maxSSEKeepAliveIntervalSeconds {
+		policy.SSEKeepAliveIntervalSeconds = maxSSEKeepAliveIntervalSeconds
 	}
 
 	if policy.AutoDisableChannel.Statuses == nil {

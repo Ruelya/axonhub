@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/sse"
 	"github.com/gin-gonic/gin"
@@ -28,13 +29,15 @@ type StreamWriter func(c *gin.Context, stream streams.Stream[*httpclient.StreamE
 
 type ChatCompletionHandlers struct {
 	ChatCompletionOrchestrator *orchestrator.ChatCompletionOrchestrator
-	StreamWriter               StreamWriter
+	// StreamWriter, when non-nil, replaces the default SSE writer. Custom writers
+	// (Gemini, binary audio, AI SDK) skip early-SSE keepalives because they use
+	// different wire framing. Nil means standard WriteSSEStream + keepalives.
+	StreamWriter StreamWriter
 }
 
 func NewChatCompletionHandlers(orchestrator *orchestrator.ChatCompletionOrchestrator) *ChatCompletionHandlers {
 	return &ChatCompletionHandlers{
 		ChatCompletionOrchestrator: orchestrator,
-		StreamWriter:               WriteSSEStream,
 	}
 }
 
@@ -71,11 +74,50 @@ func (handlers *ChatCompletionHandlers) ChatCompletionWithRequest(c *gin.Context
 
 	// log.Debug(ctx, "Chat completion request", log.Any("request", genericReq))
 
-	result, err := handlers.ChatCompletionOrchestrator.Process(ctx, genericReq)
+	// Prefer WebUI / system retry-policy setting; fall back to process config.
+	keepAlive := effectiveSSEKeepAliveInterval(ctx, handlers.ChatCompletionOrchestrator)
+	// When the client asked for a stream and keepalives are enabled, commit SSE
+	// headers immediately and ping the client while Process waits on upstream.
+	// This prevents Cloudflare (~100s idle) from 524'ing slow first-token cases.
+	// Only for the standard SSE writer path (StreamWriter == nil). Custom writers
+	// (Gemini binary, AI SDK JSON, etc.) own their own framing.
+	earlySSE := keepAlive > 0 &&
+		requestLikelyWantsStream(genericReq.Body) &&
+		handlers.StreamWriter == nil
+	headersCommitted := false
+
+	var (
+		result orchestrator.ChatCompletionResult
+		err    error
+	)
+
+	if earlySSE {
+		beginSSEResponse(c)
+		headersCommitted = true
+
+		result, err = waitProcessWithSSEKeepAlive(ctx, c, keepAlive, func(pctx context.Context) (orchestrator.ChatCompletionResult, error) {
+			return handlers.ChatCompletionOrchestrator.Process(pctx, genericReq)
+		})
+	} else {
+		result, err = handlers.ChatCompletionOrchestrator.Process(ctx, genericReq)
+	}
+
 	if err != nil {
 		log.Error(ctx, "Error processing chat completion", log.Cause(err))
 
 		httpErr := transformOrchestratorError(ctx, err, handlers.ChatCompletionOrchestrator)
+
+		if headersCommitted {
+			// Response status is already 200 SSE; surface the failure as an SSE error event.
+			writeSSEErrorEvent(c, FormatStreamError, &httpclient.Error{
+				StatusCode: httpErr.StatusCode,
+				Status:     http.StatusText(httpErr.StatusCode),
+				Body:       httpErr.Body,
+			})
+
+			return
+		}
+
 		c.JSON(httpErr.StatusCode, json.RawMessage(httpErr.Body))
 
 		return
@@ -83,6 +125,16 @@ func (handlers *ChatCompletionHandlers) ChatCompletionWithRequest(c *gin.Context
 
 	if result.ChatCompletion != nil {
 		resp := result.ChatCompletion
+
+		if headersCommitted {
+			// Unexpected: body said stream but Process returned a non-stream body.
+			// Headers are already SSE; emit payload as a single data event best-effort.
+			log.Warn(ctx, "stream request returned non-stream response after SSE headers committed")
+			c.SSEvent("", json.RawMessage(resp.Body))
+			c.Writer.Flush()
+
+			return
+		}
 
 		contentType := "application/json"
 		if ct := resp.Headers.Get("Content-Type"); ct != "" {
@@ -104,14 +156,20 @@ func (handlers *ChatCompletionHandlers) ChatCompletionWithRequest(c *gin.Context
 			}
 		}()
 
-		c.Header("Access-Control-Allow-Origin", "*")
+		stream := newUpstreamErrorStream(ctx, result.ChatCompletionStream, handlers.ChatCompletionOrchestrator.SystemService)
 
-		streamWriter := handlers.StreamWriter
-		if streamWriter == nil {
-			streamWriter = WriteSSEStream
+		// Custom stream writers (e.g. Gemini, AI SDK, binary speech) own framing.
+		// Note: WriteSSEStream itself still applies mid-stream keepalives via the global interval.
+		if handlers.StreamWriter != nil {
+			handlers.StreamWriter(c, stream)
+
+			return
 		}
 
-		streamWriter(c, newUpstreamErrorStream(ctx, result.ChatCompletionStream, handlers.ChatCompletionOrchestrator.SystemService))
+		WriteSSEStreamWithOptions(c, stream, FormatStreamError, SSEStreamOptions{
+			HeadersAlreadyWritten: headersCommitted,
+			KeepAliveInterval:     keepAlive,
+		})
 	}
 }
 
@@ -125,6 +183,15 @@ type StreamErrorFormatter func(ctx context.Context, err error) any
 // that ignore it. Pass-through channel buffers hold 64 events, so 256 is generous.
 const maxStreamEventsAfterCancel = 256
 
+// SSEStreamOptions controls WriteSSEStreamWithOptions behavior.
+type SSEStreamOptions struct {
+	// HeadersAlreadyWritten skips writing SSE headers (early keepalive session).
+	HeadersAlreadyWritten bool
+	// KeepAliveInterval sends SSE comment pings while blocked on stream.Next.
+	// Zero uses the process-wide SSEKeepAliveInterval(); negative disables.
+	KeepAliveInterval time.Duration
+}
+
 // WriteSSEStream writes stream events as Server-Sent Events (SSE) with default error formatting.
 func WriteSSEStream(c *gin.Context, stream streams.Stream[*httpclient.StreamEvent]) {
 	WriteSSEStreamWithErrorFormatter(c, stream, FormatStreamError)
@@ -132,11 +199,23 @@ func WriteSSEStream(c *gin.Context, stream streams.Stream[*httpclient.StreamEven
 
 // WriteSSEStreamWithErrorFormatter writes stream events as SSE with a custom error formatter.
 func WriteSSEStreamWithErrorFormatter(c *gin.Context, stream streams.Stream[*httpclient.StreamEvent], formatErr StreamErrorFormatter) {
+	WriteSSEStreamWithOptions(c, stream, formatErr, SSEStreamOptions{
+		KeepAliveInterval: SSEKeepAliveInterval(),
+	})
+}
+
+// WriteSSEStreamWithOptions writes stream events as SSE with optional early headers and keepalives.
+func WriteSSEStreamWithOptions(c *gin.Context, stream streams.Stream[*httpclient.StreamEvent], formatErr StreamErrorFormatter, opts SSEStreamOptions) {
 	ctx := c.Request.Context()
 	clientDisconnected := false
 
 	if formatErr == nil {
 		formatErr = FormatStreamError
+	}
+
+	keepAlive := opts.KeepAliveInterval
+	if keepAlive < 0 {
+		keepAlive = 0
 	}
 
 	defer func() {
@@ -145,11 +224,14 @@ func WriteSSEStreamWithErrorFormatter(c *gin.Context, stream streams.Stream[*htt
 		}
 	}()
 
-	// Set SSE headers
-	c.Header("Content-Type", sse.ContentType)
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
-	c.Writer.Flush()
+	if !opts.HeadersAlreadyWritten {
+		// Set SSE headers
+		c.Header("Content-Type", sse.ContentType)
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+		c.Header("X-Accel-Buffering", "no")
+		c.Writer.Flush()
+	}
 
 	// Do not pre-check ctx.Done() before Next(). If the client disconnects right
 	// after receiving the terminal event, a preferential ctx.Done() check can abort
@@ -160,7 +242,15 @@ func WriteSSEStreamWithErrorFormatter(c *gin.Context, stream streams.Stream[*htt
 	eventsAfterCancel := 0
 
 	for {
-		if !stream.Next() {
+		hasNext, nextErr := nextStreamEventWithKeepAlive(ctx, c, stream, keepAlive)
+		if nextErr != nil {
+			clientDisconnected = true
+			log.Warn(ctx, "Stream wait interrupted", log.Cause(nextErr))
+
+			return
+		}
+
+		if !hasNext {
 			if err := stream.Err(); err != nil {
 				if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 					clientDisconnected = true

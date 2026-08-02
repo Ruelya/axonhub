@@ -40,6 +40,9 @@ func New(config Config) *Server {
 
 	engine.Use(middleware.Recovery())
 
+	// Downstream SSE keepalives for long-running LLM streams (Cloudflare idle, etc.).
+	api.SetSSEKeepAliveInterval(config.SSEKeepAliveInterval)
+
 	return &Server{
 		Config: config,
 		Engine: engine,

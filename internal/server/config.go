@@ -73,6 +73,13 @@ type Config struct {
 	// LLMRequestTimeout is the maximum duration for processing a request to LLM.
 	LLMRequestTimeout time.Duration `conf:"llm_request_timeout" yaml:"llm_request_timeout" json:"llm_request_timeout"`
 
+	// SSEKeepAliveInterval is how often AxonHub sends SSE comment keepalives to the
+	// client while waiting for the upstream first event / between stream events.
+	// This prevents intermediate proxies (e.g. Cloudflare ~100s idle) from closing
+	// long-running streaming requests that have not yet produced model tokens.
+	// Set to 0 to disable. Default: 15s.
+	SSEKeepAliveInterval time.Duration `conf:"sse_keepalive_interval" yaml:"sse_keepalive_interval" json:"sse_keepalive_interval"`
+
 	Trace     tracing.Config `conf:"trace" yaml:"trace" json:"trace"`
 	Dashboard Dashboard      `conf:"dashboard" yaml:"dashboard" json:"dashboard"`
 

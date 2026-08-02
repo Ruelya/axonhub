@@ -11,6 +11,10 @@ server:
   # pid_file: "~/.config/axonhub/axonhub.pid"  # PID file for axonhub reload (env: AXONHUB_SERVER_PID_FILE)
   request_timeout: "30s"        # Request timeout duration (env: AXONHUB_SERVER_REQUEST_TIMEOUT)
   llm_request_timeout: "600s"   # LLM request timeout duration (env: AXONHUB_SERVER_LLM_REQUEST_TIMEOUT)
+  # SSE comment keepalives while waiting for upstream / between stream events.
+  # Prevents Cloudflare (~100s idle) from 524'ing slow streaming LLM requests.
+  # Set to 0s to disable. Recommended: 15s-30s. (env: AXONHUB_SERVER_SSE_KEEPALIVE_INTERVAL)
+  sse_keepalive_interval: "15s"
   trace:
     thread_header: "AH-Thread-Id" # Thread ID header name (env: AXONHUB_SERVER_TRACE_THREAD_HEADER)
     trace_header: "AH-Trace-Id" # Trace ID header name (env: AXONHUB_SERVER_TRACE_TRACE_HEADER)

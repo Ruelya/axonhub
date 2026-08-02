@@ -62,6 +62,7 @@ server:
   base_path: ""                 # API 路由的基础路径
   request_timeout: "30s"        # 请求超时时间
   llm_request_timeout: "600s"   # LLM 请求超时时间
+  sse_keepalive_interval: "15s" # 等待上游/事件间隙时发送 SSE 注释心跳（0s 关闭；可缓解 Cloudflare 约 100s 空闲断连）
   trace:
     thread_header: "AH-Thread-Id" # 线程 ID 请求头名称
     trace_header: "AH-Trace-Id" # 追踪 ID 请求头名称
@@ -79,6 +80,7 @@ server:
 - `AXONHUB_SERVER_BASE_PATH`
 - `AXONHUB_SERVER_REQUEST_TIMEOUT`
 - `AXONHUB_SERVER_LLM_REQUEST_TIMEOUT`
+- `AXONHUB_SERVER_SSE_KEEPALIVE_INTERVAL`
 - `AXONHUB_SERVER_TRACE_THREAD_HEADER`
 - `AXONHUB_SERVER_TRACE_TRACE_HEADER`
 - `AXONHUB_SERVER_TRACE_EXTRA_TRACE_HEADERS`

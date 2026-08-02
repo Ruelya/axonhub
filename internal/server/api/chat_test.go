@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -27,6 +28,75 @@ import (
 func init() {
 	gin.SetMode(gin.TestMode)
 }
+
+func TestRequestLikelyWantsStream(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, requestLikelyWantsStream(nil))
+	assert.False(t, requestLikelyWantsStream([]byte(`{"model":"gpt-4"}`)))
+	assert.False(t, requestLikelyWantsStream([]byte(`{"stream":false}`)))
+	assert.True(t, requestLikelyWantsStream([]byte(`{"stream":true}`)))
+	assert.True(t, requestLikelyWantsStream([]byte(`{"stream_options":{"include_usage":true}}`)))
+}
+
+func TestWriteSSEStream_KeepAliveCommentsWhileWaiting(t *testing.T) {
+	prev := SSEKeepAliveInterval()
+	SetSSEKeepAliveInterval(20 * time.Millisecond)
+	t.Cleanup(func() { SetSSEKeepAliveInterval(prev) })
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+	release := make(chan struct{})
+	stream := &blockingThenEventStream{
+		release: release,
+		event:   &httpclient.StreamEvent{Type: "", Data: []byte(`{"ok":true}`)},
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		WriteSSEStream(c, stream)
+	}()
+
+	// Allow at least one keepalive tick while Next() is blocked.
+	time.Sleep(60 * time.Millisecond)
+	close(release)
+	<-done
+
+	body := w.Body.String()
+	assert.Contains(t, body, ": keepalive")
+	assert.Contains(t, body, `{"ok":true}`)
+}
+
+// blockingThenEventStream blocks in Next until release is closed, then yields one event.
+type blockingThenEventStream struct {
+	release chan struct{}
+	event   *httpclient.StreamEvent
+	phase   int
+	current *httpclient.StreamEvent
+}
+
+func (s *blockingThenEventStream) Next() bool {
+	switch s.phase {
+	case 0:
+		<-s.release
+		s.phase = 1
+		s.current = s.event
+
+		return true
+	default:
+		s.phase = 2
+		s.current = nil
+
+		return false
+	}
+}
+
+func (s *blockingThenEventStream) Current() *httpclient.StreamEvent { return s.current }
+func (s *blockingThenEventStream) Err() error                       { return nil }
+func (s *blockingThenEventStream) Close() error                     { return nil }
 
 func setupUpstreamErrorPolicyTest(t *testing.T, policy biz.UpstreamErrorPolicy) (context.Context, *biz.SystemService) {
 	t.Helper()
