@@ -133,7 +133,8 @@ func TestBridgeRequestForOutbound_SkipsNativeOpenAIResponsesChannel(t *testing.T
 func TestBridgeRequestForOutbound_AlwaysClonesWhenDecisionEnabled(t *testing.T) {
 	t.Parallel()
 
-	// No apply_patch in tools — still clone so metadata is set for response restore.
+	// No freeform tools — still clone for RawTools strip, but restore name list is empty
+	// so ordinary function tools (including Grok Build "exec") are not retyped.
 	req := &llm.Request{
 		Model:     "grok-4.5",
 		APIFormat: llm.APIFormatOpenAIResponse,
@@ -149,6 +150,107 @@ func TestBridgeRequestForOutbound_AlwaysClonesWhenDecisionEnabled(t *testing.T) 
 	require.NotSame(t, req, out)
 	require.True(t, out.TransformerMetadata[MetaCustomToolBridgeEnabled].(bool))
 	require.Equal(t, "shell_command", out.Tools[0].Function.Name)
+	names, ok := out.TransformerMetadata[MetaCustomToolBridgeNames].([]string)
+	require.True(t, ok)
+	require.Empty(t, names)
+}
+
+func TestBridgeRequestForOutbound_FunctionExecNotBridgedOrRestored(t *testing.T) {
+	t.Parallel()
+
+	// Grok Build registers exec as a normal function tool with {command}.
+	req := &llm.Request{
+		Model:     "grok-4.5",
+		APIFormat: llm.APIFormatOpenAIResponse,
+		Tools: []llm.Tool{{
+			Type: llm.ToolTypeFunction,
+			Function: llm.Function{
+				Name:       "exec",
+				Parameters: json.RawMessage(`{"type":"object","required":["command"],"properties":{"command":{"type":"string"}}}`),
+			},
+		}},
+	}
+	decision := NewBridgeDecision(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse)
+	out := BridgeRequestForOutbound(req, decision)
+	require.Equal(t, llm.ToolTypeFunction, out.Tools[0].Type)
+	require.Equal(t, "exec", out.Tools[0].Function.Name)
+	require.Contains(t, string(out.Tools[0].Function.Parameters), `"command"`)
+	names := out.TransformerMetadata[MetaCustomToolBridgeNames].([]string)
+	require.Empty(t, names)
+
+	// Model returns function_call exec — must stay function_call for Grok Build.
+	args, err := json.Marshal(map[string]string{"command": "$PSVersionTable.PSVersion"})
+	require.NoError(t, err)
+	resp := &llm.Response{
+		Choices: []llm.Choice{{
+			Message: &llm.Message{
+				Role: "assistant",
+				ToolCalls: []llm.ToolCall{{
+					ID:   "call_exec_1",
+					Type: llm.ToolTypeFunction,
+					Function: llm.FunctionCall{
+						Name:      "exec",
+						Arguments: string(args),
+					},
+				}},
+			},
+		}},
+	}
+	restoreDecision := BridgeDecisionFromRequest(out)
+	restored := RestoreCustomToolCallsOnResponse(resp, restoreDecision)
+	tc := restored.Choices[0].Message.ToolCalls[0]
+	require.Equal(t, llm.ToolTypeFunction, tc.Type)
+	require.Nil(t, tc.ResponseCustomToolCall)
+	require.Equal(t, "exec", tc.Function.Name)
+	require.Contains(t, tc.Function.Arguments, "command")
+}
+
+func TestBridgeRequestForOutbound_CodexFreeformExecStillBridged(t *testing.T) {
+	t.Parallel()
+
+	req := &llm.Request{
+		Model:     "grok-4.5",
+		APIFormat: llm.APIFormatOpenAIResponse,
+		Tools: []llm.Tool{{
+			Type: llm.ToolTypeResponsesCustomTool,
+			ResponseCustomTool: &llm.ResponseCustomTool{
+				Name:        "exec",
+				Description: "Codex freeform JS orchestrator",
+			},
+		}},
+	}
+	decision := NewBridgeDecision(ChannelTypeXaiResponses, llm.APIFormatOpenAIResponse)
+	out := BridgeRequestForOutbound(req, decision)
+	require.Equal(t, llm.ToolTypeFunction, out.Tools[0].Type)
+	require.Equal(t, "exec", out.Tools[0].Function.Name)
+	require.Contains(t, string(out.Tools[0].Function.Parameters), `"input"`)
+	names := out.TransformerMetadata[MetaCustomToolBridgeNames].([]string)
+	require.Equal(t, []string{"exec"}, names)
+
+	js := `const r = await tools.shell_command({command:"echo hi"}); text(JSON.stringify(r));`
+	args, err := json.Marshal(map[string]string{"input": js})
+	require.NoError(t, err)
+	resp := &llm.Response{
+		Choices: []llm.Choice{{
+			Message: &llm.Message{
+				Role: "assistant",
+				ToolCalls: []llm.ToolCall{{
+					ID:   "call_js_1",
+					Type: llm.ToolTypeFunction,
+					Function: llm.FunctionCall{
+						Name:      "exec",
+						Arguments: string(args),
+					},
+				}},
+			},
+		}},
+	}
+	restored := RestoreCustomToolCallsOnResponse(resp, BridgeDecisionFromRequest(out))
+	tc := restored.Choices[0].Message.ToolCalls[0]
+	require.Equal(t, llm.ToolTypeResponsesCustomTool, tc.Type)
+	require.NotNil(t, tc.ResponseCustomToolCall)
+	require.Equal(t, "exec", tc.ResponseCustomToolCall.Name)
+	require.Equal(t, js, tc.ResponseCustomToolCall.Input)
 }
 
 func TestRestoreCustomToolCallsOnResponse(t *testing.T) {
