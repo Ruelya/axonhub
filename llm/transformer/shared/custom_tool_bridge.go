@@ -18,13 +18,16 @@ const (
 // OpenAI Responses API and enables Codex freeform↔function tool bridging.
 const ChannelTypeXaiResponses = "xai_responses"
 
-// DefaultBridgedCustomToolNames are Responses freeform tools that xAI does not
-// accept as type=custom. Only these names are converted; shell_command / MCP
-// function tools stay untouched.
+// DefaultBridgedCustomToolNames are Responses freeform tools (type=custom) that
+// some upstreams (e.g. xAI) do not accept as type=custom. Only tools that appear
+// as freeform/custom in the *client request* are converted and later restored.
 //
-// "exec" is Codex code_mode freeform JS orchestrator (grammar/lark). Without
-// bridging, xAI often returns function_call exec with arguments "{}", and MCP
-// nested under exec can never run.
+// Ordinary function tools with the same name (e.g. Grok Build's exec with
+// {command: string}) are never bridged or restored.
+//
+// "exec" here means Codex code_mode freeform JS orchestrator (grammar/lark), not
+// a generic shell tool. Without bridging Codex freeform exec, xAI often returns
+// function_call exec with arguments "{}", and MCP nested under exec cannot run.
 var DefaultBridgedCustomToolNames = map[string]struct{}{
 	"apply_patch": {},
 	"exec":        {},
@@ -89,22 +92,29 @@ func NewBridgeDecision(channelType string, inboundFormat llm.APIFormat) BridgeDe
 // history for providers that only understand standard function tools.
 //
 // Transformations:
-//   - tools: type custom (apply_patch) → type function with {input: string}
+//   - tools: type custom (apply_patch / freeform exec) → type function with {input: string}
 //   - assistant tool_calls: custom_tool_call → function_call with JSON args
 //   - tool results keep the same call id (function_call_output compatible)
 //
-// Returns a shallow-cloned request when changes are made; otherwise req.
+// Only freeform/custom tools present on the request (tools list or history) are
+// bridged and recorded for response restore. Function tools with the same name
+// (e.g. Grok Build exec{command}) are left as function_call end-to-end.
+//
+// Returns a shallow-cloned request when the channel decision is on; otherwise req.
 func BridgeRequestForOutbound(req *llm.Request, decision BridgeDecision) *llm.Request {
 	if req == nil || !decision.Enabled || len(decision.Names) == 0 {
 		return req
 	}
 
-	// Always clone when the channel decision is on, so metadata is set for the
-	// response path even if this turn has no apply_patch yet (model may still
-	// return one). Also guarantees RawTools are stripped for xAI.
+	// Only freeform/custom instances of allowlisted names (not every tool that
+	// happens to share a name with a Codex freeform tool).
+	activeNames := freeformBridgeNamesFromRequest(req, decision.Names)
+
+	// Always clone when the channel decision is on so RawTools can be stripped
+	// for xAI and restore metadata is explicit (possibly empty names).
 	cloned := *req
-	cloned.Tools = bridgeTools(req.Tools, decision.Names)
-	cloned.Messages = bridgeMessagesOutbound(req.Messages, decision.Names)
+	cloned.Tools = bridgeTools(req.Tools, activeNames)
+	cloned.Messages = bridgeMessagesOutbound(req.Messages, activeNames)
 
 	// Drop raw Responses tool fragments so non-OpenAI Responses upstreams do
 	// not receive unconverted custom tool JSON from ProviderExtensions.
@@ -122,10 +132,40 @@ func BridgeRequestForOutbound(req *llm.Request, decision BridgeDecision) *llm.Re
 
 	meta := cloneMetadata(req.TransformerMetadata)
 	meta[MetaCustomToolBridgeEnabled] = true
-	meta[MetaCustomToolBridgeNames] = bridgedNameList(decision.Names)
+	// Restore uses this list only — empty means do not retype any function_call
+	// back to custom (critical for Grok Build function exec).
+	meta[MetaCustomToolBridgeNames] = bridgedNameList(activeNames)
 	cloned.TransformerMetadata = meta
 
 	return &cloned
+}
+
+// freeformBridgeNamesFromRequest returns allowlisted tool names that appear as
+// Responses freeform/custom tools on this request (tool definitions or history
+// custom_tool_call). Function tools with the same name are ignored.
+func freeformBridgeNamesFromRequest(req *llm.Request, allowlist map[string]struct{}) map[string]struct{} {
+	if req == nil || len(allowlist) == 0 {
+		return map[string]struct{}{}
+	}
+	out := make(map[string]struct{})
+	for _, t := range req.Tools {
+		if t.Type == llm.ToolTypeResponsesCustomTool && t.ResponseCustomTool != nil {
+			name := t.ResponseCustomTool.Name
+			if _, ok := allowlist[name]; ok {
+				out[name] = struct{}{}
+			}
+		}
+	}
+	for _, msg := range req.Messages {
+		for _, tc := range msg.ToolCalls {
+			if name, ok := customToolCallName(tc); ok {
+				if _, allowed := allowlist[name]; allowed {
+					out[name] = struct{}{}
+				}
+			}
+		}
+	}
+	return out
 }
 
 // RestoreCustomToolCallsOnResponse converts function-style apply_patch calls
@@ -158,6 +198,9 @@ func RestoreCustomToolCallsOnResponse(resp *llm.Response, decision BridgeDecisio
 }
 
 // BridgeDecisionFromRequest reads bridge flags written by BridgeRequestForOutbound.
+// Names is exactly the freeform set recorded for this request (may be empty).
+// Do not fall back to DefaultBridgedCustomToolNames — that would restore Grok
+// Build function "exec" into custom_tool_call and break the client.
 func BridgeDecisionFromRequest(req *llm.Request) BridgeDecision {
 	if req == nil || req.TransformerMetadata == nil {
 		return BridgeDecision{}
@@ -170,18 +213,17 @@ func BridgeDecisionFromRequest(req *llm.Request) BridgeDecision {
 	switch v := req.TransformerMetadata[MetaCustomToolBridgeNames].(type) {
 	case []string:
 		for _, n := range v {
-			names[n] = struct{}{}
+			if n = strings.TrimSpace(n); n != "" {
+				names[n] = struct{}{}
+			}
 		}
 	case []any:
 		for _, item := range v {
 			if s, ok := item.(string); ok {
-				names[s] = struct{}{}
+				if s = strings.TrimSpace(s); s != "" {
+					names[s] = struct{}{}
+				}
 			}
-		}
-	}
-	if len(names) == 0 {
-		for n := range DefaultBridgedCustomToolNames {
-			names[n] = struct{}{}
 		}
 	}
 	return BridgeDecision{Enabled: true, Names: names}
