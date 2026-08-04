@@ -17,6 +17,8 @@ import {
   useUpdateUserAgentPassThroughSettings,
   usePassThroughSettings,
   useUpdatePassThroughSettings,
+  useAutoPromptCacheKeyFromSessionSettings,
+  useUpdateAutoPromptCacheKeyFromSessionSettings,
 } from '../data/system';
 import { GMTTimeZoneOptions } from '../data/timezones';
 
@@ -35,6 +37,11 @@ export function GeneralSettings() {
   const { data: ptSettings, isLoading: isLoadingPTSettings } = usePassThroughSettings();
   const updatePTSettings = useUpdatePassThroughSettings();
   const [passThroughEnabled, setPassThroughEnabled] = useState(false);
+
+  // Auto prompt_cache_key from client session/trace
+  const { data: pckSettings, isLoading: isLoadingPckSettings } = useAutoPromptCacheKeyFromSessionSettings();
+  const updatePckSettings = useUpdateAutoPromptCacheKeyFromSessionSettings();
+  const [autoPckFromSessionEnabled, setAutoPckFromSessionEnabled] = useState(true);
 
   const [currencyCode, setCurrencyCode] = useState('USD');
   const [timezone, setTimezone] = useState('UTC');
@@ -72,6 +79,12 @@ export function GeneralSettings() {
     }
   }, [ptSettings]);
 
+  useEffect(() => {
+    if (pckSettings) {
+      setAutoPckFromSessionEnabled(pckSettings.enabled);
+    }
+  }, [pckSettings]);
+
   const handleSave = async () => {
     setIsLoading(true);
     try {
@@ -103,6 +116,16 @@ export function GeneralSettings() {
     } catch {
       // Revert state on error
       setPassThroughEnabled(previousValue);
+    }
+  };
+
+  const handleAutoPckFromSessionChange = async (enabled: boolean) => {
+    const previousValue = autoPckFromSessionEnabled;
+    setAutoPckFromSessionEnabled(enabled);
+    try {
+      await updatePckSettings.mutateAsync({ enabled });
+    } catch {
+      setAutoPckFromSessionEnabled(previousValue);
     }
   };
 
@@ -185,6 +208,20 @@ export function GeneralSettings() {
               checked={passThroughEnabled}
               onCheckedChange={handlePassThroughChange}
               disabled={isLoadingPTSettings || updatePTSettings.isPending}
+            />
+          </div>
+          <div className='flex items-center justify-between'>
+            <div className='space-y-0.5'>
+              <Label htmlFor='auto-pck-from-session'>{t('system.autoPromptCacheKeyFromSession.label')}</Label>
+              <div className='text-muted-foreground text-sm'>
+                {t('system.autoPromptCacheKeyFromSession.helpText')}
+              </div>
+            </div>
+            <Switch
+              id='auto-pck-from-session'
+              checked={autoPckFromSessionEnabled}
+              onCheckedChange={handleAutoPckFromSessionChange}
+              disabled={isLoadingPckSettings || updatePckSettings.isPending}
             />
           </div>
         </CardContent>

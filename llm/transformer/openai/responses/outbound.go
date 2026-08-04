@@ -275,16 +275,22 @@ func (t *OutboundTransformer) TransformRequest(ctx context.Context, llmReq *llm.
 		Truncation:           xmap.GetStringPtr(llmReq.TransformerMetadata, "truncation"),
 	}
 
-	if lo.FromPtr(payload.PromptCacheKey) == "" {
+	// Only derive prompt_cache_key from a client-provided, stable session/trace.
+	// Skip AxonHub auto-generated at-<uuid> ids (per-request, useless for cache).
+	// When the system switch is off, do not inject anything (client body keys still win above).
+	if lo.FromPtr(payload.PromptCacheKey) == "" &&
+		shared.AutoPromptCacheKeyFromSessionEnabled(llmReq.TransformerMetadata) {
 		if sessionID, ok := shared.GetSessionID(ctx); ok {
-			// A session may multiplex several concurrent conversations
-			// (e.g. Claude Code subagents); scope the cache key to the
-			// conversation so they do not evict each other upstream.
-			if anchor := conversationAnchor(llmReq.Messages); anchor != "" {
-				sessionID = sessionID + "-" + anchor
+			sessionID = strings.TrimSpace(sessionID)
+			if sessionID != "" && !shared.IsAxonHubAutoTraceID(sessionID) {
+				// A session may multiplex several concurrent conversations
+				// (e.g. Claude Code subagents); scope the cache key to the
+				// conversation so they do not evict each other upstream.
+				if anchor := conversationAnchor(llmReq.Messages); anchor != "" {
+					sessionID = sessionID + "-" + anchor
+				}
+				payload.PromptCacheKey = lo.ToPtr(sessionID)
 			}
-
-			payload.PromptCacheKey = lo.ToPtr(sessionID)
 		}
 	}
 

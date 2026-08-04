@@ -9,6 +9,7 @@ import (
 
 	"github.com/looplj/axonhub/internal/ent/channel"
 	"github.com/looplj/axonhub/llm"
+	"github.com/looplj/axonhub/llm/transformer/shared"
 )
 
 // ClientRouteDecision describes request/response compat actions for a
@@ -187,12 +188,7 @@ func GrokSessionIDFromHeaderMap(headers map[string]any) string {
 // IsAxonHubAutoPromptCacheKey reports whether key looks like AxonHub's fallback
 // (AH-Trace-Id "at-<uuid>" or "at-<uuid>-<anchor>"), not a client session id.
 func IsAxonHubAutoPromptCacheKey(key string) bool {
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return false
-	}
-	// GenerateTraceID format: at-{{uuid}} optionally + "-" + conversation anchor.
-	return strings.HasPrefix(strings.ToLower(key), "at-")
+	return shared.IsAxonHubAutoTraceID(key)
 }
 
 // InjectPromptCacheKeyJSON sets prompt_cache_key on a JSON request body.

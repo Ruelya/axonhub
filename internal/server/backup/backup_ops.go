@@ -117,6 +117,7 @@ var systemConfigBackupKeys = []string{
 	biz.SystemKeyGeneralSettings,
 	biz.SystemKeyUserAgentPassThrough,
 	biz.SystemKeyPassThrough,
+	biz.SystemKeyAutoPromptCacheKeyFromSession,
 	biz.SystemKeyQuotaEnforcementSettings,
 	biz.SystemKeySecuritySettings,
 	biz.SystemKeyProxyPresets,

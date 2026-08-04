@@ -145,6 +145,10 @@ type AutoDisableChannelOnboarding struct {
 	CompletedAt *time.Time `json:"completedAt,omitempty"`
 }
 
+type AutoPromptCacheKeyFromSessionSettings struct {
+	Enabled bool `json:"enabled"`
+}
+
 type BackupPayload struct {
 	Success bool    `json:"success"`
 	Data    *string `json:"data,omitempty"`
@@ -571,6 +575,10 @@ type UpdateAutoBackupSettingsInput struct {
 	IncludeUsageStats    *bool                `json:"includeUsageStats,omitempty"`
 	IncludeRequestLogs   *bool                `json:"includeRequestLogs,omitempty"`
 	RetentionDays        *int                 `json:"retentionDays,omitempty"`
+}
+
+type UpdateAutoPromptCacheKeyFromSessionSettingsInput struct {
+	Enabled bool `json:"enabled"`
 }
 
 type UpdateBrandSettingsInput struct {

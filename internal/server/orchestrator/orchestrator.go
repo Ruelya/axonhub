@@ -257,6 +257,7 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 	middlewares = append(middlewares,
 		enforceQuota(inbound, processor.QuotaService),
 		applyAutoReasoningEffort(processor.SystemService),
+		applyPromptCacheKeyPolicy(processor.SystemService),
 		checkApiKeyModelAccess(inbound),
 		applyModelMapping(inbound),
 		selectCandidates(inbound, processor.quotaProvider, processor.SystemService),

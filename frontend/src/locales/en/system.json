@@ -415,6 +415,8 @@
   "system.userAgentPassThrough.helpText": "When enabled, the original User-Agent header from the client request is forwarded to upstream providers. When disabled, AxonHub uses its own User-Agent.",
   "system.passThrough.label": "Pass-Through",
   "system.passThrough.helpText": "When enabled, both the request body and the upstream response are passed through only when the client request format matches the channel format. Prompt injection and prompt protection will not take effect.",
+  "system.autoPromptCacheKeyFromSession.label": "Inject prompt_cache_key from session",
+  "system.autoPromptCacheKeyFromSession.helpText": "When enabled: only auto-set prompt_cache_key from a meaningful client session/trace (e.g. Session-Id, client AH-Trace-Id, OpenCode session headers). Never uses gateway auto-generated at- trace IDs. When disabled: never auto-inject (client-provided prompt_cache_key still passes through).",
   "system.quota.collection.title": "Provider Quota Collection",
   "system.quota.collection.description": "Control whether AxonHub requests quota information from supported providers.",
   "system.quota.collection.enabled.label": "Enable Provider Quota Collection",
