@@ -104,6 +104,12 @@ const (
 	// When set to true, the system will pass through the original User-Agent header to upstream AI providers.
 	SystemKeyUserAgentPassThrough = "system_user_agent_pass_through"
 
+	// SystemKeyAutoPromptCacheKeyFromSession controls whether Responses outbound may
+	// derive prompt_cache_key from a client session/trace when the body omits it.
+	// Default when unset: true (only meaningful client session/trace; never auto at- ids).
+	// When false: never auto-inject prompt_cache_key (client-provided keys still pass through).
+	SystemKeyAutoPromptCacheKeyFromSession = "system_auto_prompt_cache_key_from_session"
+
 	// SystemKeyPassThrough is the key used to store the global body/response pass-through setting.
 	// When set to true, channels that do not explicitly disable pass-through will forward the original
 	// request body and the raw provider response/stream to the client without re-serialization, as long as
@@ -1767,6 +1773,36 @@ func (s *SystemService) SetUserAgentPassThrough(ctx context.Context, enabled boo
 	}
 
 	return s.setSystemValue(ctx, SystemKeyUserAgentPassThrough, strValue)
+}
+
+// AutoPromptCacheKeyFromSession reports whether Responses outbound may derive
+// prompt_cache_key from a stable client session/trace when the body omits it.
+// Default when the key is unset: true.
+func (s *SystemService) AutoPromptCacheKeyFromSession(ctx context.Context) (bool, error) {
+	value, err := s.getSystemValue(ctx, SystemKeyAutoPromptCacheKeyFromSession)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return true, nil
+		}
+
+		return false, fmt.Errorf("failed to get auto prompt_cache_key from session setting: %w", err)
+	}
+
+	// Explicit false only; empty/other values keep the default-on behavior for safety.
+	if value == "false" {
+		return false, nil
+	}
+	return true, nil
+}
+
+// SetAutoPromptCacheKeyFromSession sets the auto prompt_cache_key-from-session switch.
+func (s *SystemService) SetAutoPromptCacheKeyFromSession(ctx context.Context, enabled bool) error {
+	strValue := "false"
+	if enabled {
+		strValue = "true"
+	}
+
+	return s.setSystemValue(ctx, SystemKeyAutoPromptCacheKeyFromSession, strValue)
 }
 
 // PassThrough retrieves the global body/response pass-through setting.

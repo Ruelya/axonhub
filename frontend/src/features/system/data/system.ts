@@ -1919,6 +1919,69 @@ export function useUpdatePassThroughSettings() {
   });
 }
 
+// Auto prompt_cache_key from client session/trace
+const AUTO_PROMPT_CACHE_KEY_FROM_SESSION_SETTINGS_QUERY = `
+  query AutoPromptCacheKeyFromSessionSettings {
+    autoPromptCacheKeyFromSessionSettings {
+      enabled
+    }
+  }
+`;
+
+const UPDATE_AUTO_PROMPT_CACHE_KEY_FROM_SESSION_SETTINGS_MUTATION = `
+  mutation UpdateAutoPromptCacheKeyFromSessionSettings($input: UpdateAutoPromptCacheKeyFromSessionSettingsInput!) {
+    updateAutoPromptCacheKeyFromSessionSettings(input: $input)
+  }
+`;
+
+export interface AutoPromptCacheKeyFromSessionSettings {
+  enabled: boolean;
+}
+
+export interface UpdateAutoPromptCacheKeyFromSessionSettingsInput {
+  enabled: boolean;
+}
+
+export function useAutoPromptCacheKeyFromSessionSettings() {
+  const { handleError } = useErrorHandler();
+
+  return useQuery({
+    queryKey: ['autoPromptCacheKeyFromSessionSettings'],
+    queryFn: async () => {
+      try {
+        const data = await graphqlRequest<{
+          autoPromptCacheKeyFromSessionSettings: AutoPromptCacheKeyFromSessionSettings;
+        }>(AUTO_PROMPT_CACHE_KEY_FROM_SESSION_SETTINGS_QUERY);
+        return data.autoPromptCacheKeyFromSessionSettings;
+      } catch (error) {
+        handleError(error, i18n.t('common.errors.internalServerError'));
+        throw error;
+      }
+    },
+  });
+}
+
+export function useUpdateAutoPromptCacheKeyFromSessionSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateAutoPromptCacheKeyFromSessionSettingsInput) => {
+      const data = await graphqlRequest<{ updateAutoPromptCacheKeyFromSessionSettings: boolean }>(
+        UPDATE_AUTO_PROMPT_CACHE_KEY_FROM_SESSION_SETTINGS_MUTATION,
+        { input }
+      );
+      return data.updateAutoPromptCacheKeyFromSessionSettings;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['autoPromptCacheKeyFromSessionSettings'] });
+      toast.success(i18n.t('common.success.systemUpdated'));
+    },
+    onError: () => {
+      toast.error(i18n.t('common.errors.systemUpdateFailed'));
+    },
+  });
+}
+
 const QUOTA_ENFORCEMENT_SETTINGS_QUERY = `
   query QuotaEnforcementSettings {
     quotaEnforcementSettings {

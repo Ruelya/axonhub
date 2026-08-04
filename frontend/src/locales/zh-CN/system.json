@@ -407,6 +407,8 @@
   "system.userAgentPassThrough.helpText": "启用后，客户端请求中的原始 User-Agent 请求头会转发给上游提供商；禁用时 AxonHub 使用自身的 User-Agent。",
   "system.passThrough.label": "透传",
   "system.passThrough.helpText": "启用后，请求和响应都会透传，但仅在客户端请求格式与渠道格式一致时生效。提示词注入和提示词保护将不会生效。",
+  "system.autoPromptCacheKeyFromSession.label": "从会话注入 prompt_cache_key",
+  "system.autoPromptCacheKeyFromSession.helpText": "启用后：仅当请求带有有意义的客户端 session/trace（如 Session-Id、客户端 AH-Trace-Id、OpenCode 会话头等）时，才自动写入 prompt_cache_key；不会使用网关自动生成的 at- 追踪 ID。关闭后：绝不自动注入（客户端自己提供的 prompt_cache_key 仍会透传）。",
   "system.quota.collection.title": "提供商配额采集",
   "system.quota.collection.description": "控制 AxonHub 是否向支持的提供商请求配额信息。",
   "system.quota.collection.enabled.label": "启用提供商配额采集",

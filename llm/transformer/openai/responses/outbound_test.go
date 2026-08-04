@@ -1101,6 +1101,59 @@ func TestOutboundTransformer_TransformRequest_UsesSharedSessionIDAsPromptCacheKe
 	require.Equal(t, "shared-session-123-"+conversationAnchor(req.Messages), *payload.PromptCacheKey)
 }
 
+func TestOutboundTransformer_TransformRequest_SkipsAxonHubAutoTraceAsPromptCacheKey(t *testing.T) {
+	transformer, err := NewOutboundTransformer("https://api.openai.com", "test-api-key")
+	require.NoError(t, err)
+
+	// Per-request auto trace ids must not become prompt_cache_key.
+	ctx := shared.WithSessionID(context.Background(), "at-e540a313-1ef5-42d5-b147-e56c11485abe")
+
+	req := &llm.Request{
+		Model: "gpt-5.4",
+		Messages: []llm.Message{
+			{Role: "user", Content: llm.MessageContent{Content: lo.ToPtr("Hello")}},
+		},
+	}
+
+	httpReq, err := transformer.TransformRequest(ctx, req)
+	require.NoError(t, err)
+
+	var payload Request
+	require.NoError(t, json.Unmarshal(httpReq.Body, &payload))
+	require.Nil(t, payload.PromptCacheKey)
+}
+
+func TestOutboundTransformer_TransformRequest_RespectsAutoPromptCacheKeySwitchOff(t *testing.T) {
+	transformer, err := NewOutboundTransformer("https://api.openai.com", "test-api-key")
+	require.NoError(t, err)
+
+	ctx := shared.WithSessionID(context.Background(), "shared-session-123")
+	req := &llm.Request{
+		Model: "gpt-5.4",
+		Messages: []llm.Message{
+			{Role: "user", Content: llm.MessageContent{Content: lo.ToPtr("Hello")}},
+		},
+		TransformerMetadata: map[string]any{
+			shared.TransformerMetadataKeyAutoPromptCacheKeyFromSession: false,
+		},
+	}
+
+	httpReq, err := transformer.TransformRequest(ctx, req)
+	require.NoError(t, err)
+
+	var payload Request
+	require.NoError(t, json.Unmarshal(httpReq.Body, &payload))
+	require.Nil(t, payload.PromptCacheKey)
+
+	// Client-provided key still wins when switch is off.
+	req.PromptCacheKey = lo.ToPtr("client-key")
+	httpReq, err = transformer.TransformRequest(ctx, req)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(httpReq.Body, &payload))
+	require.NotNil(t, payload.PromptCacheKey)
+	require.Equal(t, "client-key", *payload.PromptCacheKey)
+}
+
 func TestOutboundTransformer_TransformRequest_PromptCacheKeyScopedPerConversation(t *testing.T) {
 	transformer, err := NewOutboundTransformer("https://api.openai.com", "test-api-key")
 	require.NoError(t, err)

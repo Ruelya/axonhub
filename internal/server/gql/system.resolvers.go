@@ -332,6 +332,16 @@ func (r *mutationResolver) UpdatePassThroughSettings(ctx context.Context, input 
 	return true, nil
 }
 
+// UpdateAutoPromptCacheKeyFromSessionSettings is the resolver for the updateAutoPromptCacheKeyFromSessionSettings field.
+func (r *mutationResolver) UpdateAutoPromptCacheKeyFromSessionSettings(ctx context.Context, input UpdateAutoPromptCacheKeyFromSessionSettingsInput) (bool, error) {
+	err := r.systemService.SetAutoPromptCacheKeyFromSession(ctx, input.Enabled)
+	if err != nil {
+		return false, fmt.Errorf("failed to update auto prompt_cache_key from session settings: %w", err)
+	}
+
+	return true, nil
+}
+
 // UpdateClientCompatSettings is the resolver for the updateClientCompatSettings field.
 func (r *mutationResolver) UpdateClientCompatSettings(ctx context.Context, input UpdateClientCompatSettingsInput) (bool, error) {
 	update := biz.ClientCompatUpdate{
@@ -660,6 +670,18 @@ func (r *queryResolver) PassThroughSettings(ctx context.Context) (*PassThroughSe
 	}
 
 	return &PassThroughSettings{
+		Enabled: enabled,
+	}, nil
+}
+
+// AutoPromptCacheKeyFromSessionSettings is the resolver for the autoPromptCacheKeyFromSessionSettings field.
+func (r *queryResolver) AutoPromptCacheKeyFromSessionSettings(ctx context.Context) (*AutoPromptCacheKeyFromSessionSettings, error) {
+	enabled, err := r.systemService.AutoPromptCacheKeyFromSession(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auto prompt_cache_key from session settings: %w", err)
+	}
+
+	return &AutoPromptCacheKeyFromSessionSettings{
 		Enabled: enabled,
 	}, nil
 }
