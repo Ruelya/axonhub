@@ -1,7 +1,7 @@
 import { useChannels } from '../context/channels-context';
 import { ChannelsActionDialog } from './channels-action-dialog';
 import { ChannelsArchiveDialog } from './channels-archive-dialog';
-import { ChannelsAPIKeyRulesDialog } from './channels-apikey-rules-dialog';
+import { ChannelsAvailabilityDialog } from './channels-availability-dialog';
 import { ChannelsBulkApplyTemplateDialog } from './channels-bulk-apply-template-dialog';
 import { ChannelsBulkClearTemplateDialog } from './channels-bulk-clear-template-dialog';
 import { ChannelsBulkArchiveDialog } from './channels-bulk-archive-dialog';
@@ -21,7 +21,7 @@ import { ChannelsProxyDialog } from './channels-proxy-dialog';
 import { ChannelsStatusDialog } from './channels-status-dialog';
 import { ChannelsTestDialog } from './channels-test-dialog';
 import { ChannelsTestHistoryDrawer } from './channels-test-history-drawer';
-import { ChannelsTestAPIKeysDialog } from './channels-test-api-keys-dialog';
+import { ChannelsAPIKeyManagementDialog } from './channels-api-key-management-dialog';
 import { ChannelsRateLimitDialog } from './channels-rate-limit-dialog';
 import { ChannelsTransformOptionsDialog } from './channels-transform-options-dialog';
 import { ChannelsEndpointsDialog } from './channels-endpoints-dialog';
@@ -312,9 +312,9 @@ export function ChannelsDialogs() {
             }}
           />
 
-          <ChannelsAPIKeyRulesDialog
-            key={`channel-api-key-rules-${currentRow.id}`}
-            open={open === 'apiKeyRules'}
+          <ChannelsAvailabilityDialog
+            key={`channel-availability-${currentRow.id}`}
+            open={open === 'availability'}
             onOpenChange={(isOpen) => {
               if (!isOpen) {
                 setOpen(null);
@@ -326,9 +326,9 @@ export function ChannelsDialogs() {
             currentRow={currentRow}
           />
 
-          <ChannelsTestAPIKeysDialog
-            key={`channel-test-api-keys-${currentRow.id}`}
-            open={open === 'testAPIKeys'}
+          <ChannelsAPIKeyManagementDialog
+            key={`channel-key-management-${currentRow.id}`}
+            open={open === 'keyManagement'}
             onOpenChange={(isOpen) => {
               if (!isOpen) {
                 setOpen(null);

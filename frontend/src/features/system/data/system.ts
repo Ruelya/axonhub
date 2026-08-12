@@ -99,7 +99,6 @@ const RETRY_POLICY_QUERY = `
       retryDelayMs
       streamFirstEventTimeoutSeconds
       nonStreamResponseTimeoutSeconds
-      sseKeepAliveIntervalSeconds
       loadBalancerStrategy
       traceStickyMode
       enabled
@@ -351,7 +350,6 @@ export interface RetryPolicy {
   retryDelayMs: number;
   streamFirstEventTimeoutSeconds: number;
   nonStreamResponseTimeoutSeconds: number;
-  sseKeepAliveIntervalSeconds: number;
   loadBalancerStrategy: string;
   traceStickyMode: TraceStickyMode;
   enabled: boolean;
@@ -381,7 +379,6 @@ export interface RetryPolicyInput {
   retryDelayMs?: number;
   streamFirstEventTimeoutSeconds?: number;
   nonStreamResponseTimeoutSeconds?: number;
-  sseKeepAliveIntervalSeconds?: number;
   loadBalancerStrategy?: string;
   traceStickyMode?: TraceStickyMode;
   enabled?: boolean;

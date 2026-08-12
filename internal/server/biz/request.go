@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/eko/gocache/lib/v4/store"
+	"github.com/tidwall/gjson"
 
 	"github.com/looplj/axonhub/internal/authz"
 	"github.com/looplj/axonhub/internal/contexts"
@@ -343,6 +344,10 @@ func (s *RequestService) CreateRequestExecution(
 		SetRequestHeaders(requestHeadersBytes).
 		SetPassThroughApplied(passThroughApplied)
 
+	if reasoningEffort := extractOutboundReasoningEffort(channelRequest, format); reasoningEffort != nil {
+		mut = mut.SetReasoningEffort(*reasoningEffort)
+	}
+
 	if channelRequest.URL != "" {
 		mut = mut.SetRequestURL(channelRequest.URL)
 	}
@@ -381,6 +386,32 @@ func (s *RequestService) CreateRequestExecution(
 	}
 
 	return execution, nil
+}
+
+// extractOutboundReasoningEffort returns the reasoning effort from the final
+// request body that will be sent to the upstream provider.
+func extractOutboundReasoningEffort(channelRequest httpclient.Request, format llm.APIFormat) *string {
+	var path string
+
+	switch format {
+	case llm.APIFormatOpenAIChatCompletion:
+		path = "reasoning_effort"
+	case llm.APIFormatOpenAIResponse, llm.APIFormatOpenAIResponseCompact:
+		path = "reasoning.effort"
+	case llm.APIFormatAnthropicMessage:
+		path = "output_config.effort"
+	default:
+		return nil
+	}
+
+	result := gjson.GetBytes(channelRequest.Body, path)
+	if result.Type != gjson.String || result.String() == "" {
+		return nil
+	}
+
+	effort := result.String()
+
+	return &effort
 }
 
 // LatencyMetrics holds latency metrics for a request.

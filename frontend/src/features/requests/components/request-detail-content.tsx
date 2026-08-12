@@ -1,13 +1,8 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { DashboardIcon } from '@radix-ui/react-icons';
 import { zhCN, enUS } from 'date-fns/locale';
-import { Copy, Clock, Key, Database, FileText, Layers, Download, Terminal, MonitorSmartphone } from 'lucide-react';
-import { clientSourceLabel } from '@/features/system/data/client-detect';
-import { previewRequestBodyPatch, resolveCompatDisplay } from '../utils/client-compat';
-import { BodyCompatDiff } from './body-compat-diff';
-import { ResponseCompatDiff } from './response-compat-diff';
-import { SchemaComparePanel } from './schema-compare-panel';
+import { Copy, Clock, Key, Database, FileText, Layers, Download, Terminal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { extractNumberID } from '@/lib/utils';
@@ -23,8 +18,10 @@ import { type Request, useRequest, useRequestExecutions } from '../data';
 import { ChunksDialog } from './chunks-dialog';
 import { CurlPreviewDialog } from './curl-preview-dialog';
 import { getStatusColor } from './help';
+import { RequestConversationViewer } from './request-conversation-viewer';
 import { ResponseFlow } from './response-flow';
 import { parseResponse } from '../utils/response-parser';
+import { parseRequestConversation } from '../utils/request-conversation';
 import { generateRequestCurl, generateExecutionCurl } from '../utils/curl-generator';
 
 interface RequestDetailContentProps {
@@ -49,10 +46,24 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [audioLoadFailed, setAudioLoadFailed] = useState(false);
   const [responseView, setResponseView] = useState<'preview' | 'json'>('preview');
+  const [requestBodyView, setRequestBodyView] = useState<'conversation' | 'json'>('conversation');
 
   const { data: settings } = useGeneralSettings();
   const { data: requestData, isLoading } = useRequest(requestId, { projectId, disableAutoRefresh: isPreviewStreaming });
   const request = previewRequest ?? requestData;
+
+  // Auto-select the appropriate request-body view once data is available:
+  // use the conversation view only when the body actually parses as a conversation.
+  // Only auto-adjust when the underlying request body changes, so manual toggles stick.
+  const lastAutoBodyRef = useRef<string>('');
+  useEffect(() => {
+    if (!request) return;
+    const bodyKey = JSON.stringify({ id: request?.id, body: request?.requestBody, format: request?.format });
+    if (bodyKey === lastAutoBodyRef.current) return;
+    lastAutoBodyRef.current = bodyKey;
+    const isConversation = !!parseRequestConversation(request.requestBody, request.format);
+    setRequestBodyView(isConversation ? 'conversation' : 'json');
+  }, [request?.id, request?.requestBody, request?.format]);
   const {
     data: executions,
     isLoading: isExecutionsLoading,
@@ -86,33 +97,6 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
   const isLive = isPreviewStreaming || !!(request?.status === 'processing' && request?.stream);
   const hasResponseBody = !!(request?.responseBody && Object.keys(request.responseBody).length > 0);
   const hasResponseChunks = !!(request?.responseChunks && request.responseChunks.length > 0);
-
-  const clientCompat = useMemo(
-    () =>
-      resolveCompatDisplay({
-        clientProfile: request?.clientProfile,
-        clientDetectSource: request?.clientDetectSource,
-        clientCompatApplied: request?.clientCompatApplied,
-        requestHeaders: request?.requestHeaders,
-      }),
-    [request?.clientProfile, request?.clientDetectSource, request?.clientCompatApplied, request?.requestHeaders]
-  );
-
-  const latestExecutionRequestBody = useMemo(() => {
-    const edges = executions?.edges;
-    if (!edges || edges.length === 0) return null;
-    return edges[0]?.node?.requestBody ?? null;
-  }, [executions?.edges]);
-
-  const requestBodyCompat = useMemo(
-    () =>
-      previewRequestBodyPatch({
-        inboundBody: request?.requestBody,
-        outboundBody: latestExecutionRequestBody,
-        requestHeaders: request?.requestHeaders,
-      }),
-    [request?.requestBody, request?.requestHeaders, latestExecutionRequestBody]
-  );
 
   const extractResponseText = useCallback(() => {
     if (!request) return '';
@@ -407,42 +391,6 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
               </div>
               <p className='text-muted-foreground font-mono text-xs'>{request.apiKey?.name || t('requests.columns.unknown')}</p>
             </div>
-
-            <div className='bg-muted/30 flex items-center justify-between gap-2 rounded-lg border px-3 py-2'>
-              <div className='flex items-center gap-2'>
-                <MonitorSmartphone className='text-primary h-3.5 w-3.5' />
-                <span className='text-xs font-medium'>{t('requests.client.label')}</span>
-              </div>
-              <div className='flex flex-wrap items-center justify-end gap-1'>
-                <Badge
-                  variant='secondary'
-                  className={
-                    clientCompat.applied
-                      ? 'border-red-200 bg-red-50 font-mono text-[11px] text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300'
-                      : clientCompat.profileId && clientCompat.profileId !== 'unknown'
-                        ? 'border-emerald-200 bg-emerald-50 font-mono text-[11px] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'font-mono text-[11px]'
-                  }
-                >
-                  {clientCompat.displayName || t('requests.client.unknown')}
-                </Badge>
-                {clientCompat.applied && (
-                  <Badge variant='outline' className='border-red-200 text-[10px] text-red-600 dark:border-red-800 dark:text-red-300'>
-                    {t('requests.client.compat.applied')}
-                  </Badge>
-                )}
-                {clientCompat.source !== 'none' && (
-                  <span className='text-muted-foreground text-[10px]'>
-                    {t('requests.client.via', {
-                      source:
-                        clientCompat.source === 'explicit'
-                          ? clientSourceLabel('explicit')
-                          : clientSourceLabel('user_agent'),
-                    })}
-                  </span>
-                )}
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -469,7 +417,7 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
           const formatCurrency = (val: number) =>
             t('currencies.format', {
               val,
-              currency: settings?.currencyCode,
+              currency: settings?.currencyCode ?? 'USD',
               locale: i18n.language === 'zh' ? 'zh-CN' : 'en-US',
               minimumFractionDigits: 6,
             });
@@ -606,69 +554,41 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                 </div>
               )}
               <div className='space-y-4'>
-                <div className='flex items-center justify-between'>
+                <div className='flex flex-wrap items-center justify-between gap-2'>
                   <h4 className='flex items-center gap-2 text-base font-semibold'>
                     <FileText className='text-primary h-4 w-4' />
                     {t('requests.columns.requestBody')}
                   </h4>
-                  <div className='flex gap-2'>
-                    <Button variant='outline' size='sm' onClick={() => copyToClipboard(formatJson(request.requestBody))} className='hover:bg-primary hover:text-primary-foreground'>
-                      <Copy className='mr-2 h-4 w-4' />
-                      {t('requests.dialogs.jsonViewer.copy')}
-                    </Button>
-                    <Button variant='outline' size='sm' onClick={() => downloadFile(formatJson(request.requestBody), `request-body-${request.id}.json`)} className='hover:bg-primary hover:text-primary-foreground'>
-                      <Download className='mr-2 h-4 w-4' />
-                      {t('requests.dialogs.jsonViewer.download')}
-                    </Button>
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <Tabs value={requestBodyView} onValueChange={(v: any) => setRequestBodyView(v)} className='w-auto'>
+                      <TabsList className='grid w-[220px] grid-cols-2'>
+                        <TabsTrigger value='conversation'>{t('requests.detail.tabs.conversation')}</TabsTrigger>
+                        <TabsTrigger value='json'>{t('requests.detail.tabs.json')}</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    <div className='flex gap-2'>
+                      <Button variant='outline' size='sm' onClick={() => copyToClipboard(formatJson(request.requestBody))} className='hover:bg-primary hover:text-primary-foreground'>
+                        <Copy className='mr-2 h-4 w-4' />
+                        {t('requests.dialogs.jsonViewer.copy')}
+                      </Button>
+                      <Button variant='outline' size='sm' onClick={() => downloadFile(formatJson(request.requestBody), `request-body-${request.id}.json`)} className='hover:bg-primary hover:text-primary-foreground'>
+                        <Download className='mr-2 h-4 w-4' />
+                        {t('requests.dialogs.jsonViewer.download')}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                {(requestBodyCompat.source === 'execution' ||
-                  (clientCompat.applied && requestBodyCompat.changed)) && (
-                  <div className='space-y-2'>
-                    <h5 className='text-muted-foreground text-sm font-medium'>
-                      {t('requests.client.compat.requestDiffTitle')}
-                    </h5>
-                    <BodyCompatDiff
-                      original={requestBodyCompat.original}
-                      patched={requestBodyCompat.patched}
-                      changed={requestBodyCompat.changed}
-                      compat={{
-                        ...clientCompat,
-                        applied: requestBodyCompat.changed || clientCompat.applied,
-                      }}
-                      sourceLabel={
-                        requestBodyCompat.source === 'execution'
-                          ? t('requests.client.compat.requestDiffFromExecution')
-                          : t('requests.client.compat.requestDiffPreview')
-                      }
-                      copySuccessLabel={t('requests.client.compat.copyPatchedRequestSuccess')}
-                    />
+                {requestBodyView === 'conversation' ? (
+                  <RequestConversationViewer body={request.requestBody} format={request.format} />
+                ) : (
+                  <div className='bg-muted/20 h-[500px] w-full overflow-auto rounded-lg border p-4'>
+                    <JsonViewer data={request.requestBody} rootName='' defaultExpanded={true} expandDepth='all' hideArrayIndices={true} className='text-sm' />
                   </div>
                 )}
-                <div className='bg-muted/20 h-[500px] w-full overflow-auto rounded-lg border p-4'>
-                  <JsonViewer data={request.requestBody} rootName='' defaultExpanded={true} expandDepth='all' hideArrayIndices={true} className='text-sm' />
-                </div>
               </div>
             </TabsContent>
 
             <TabsContent value='response' className='space-y-6 p-6'>
-              {hasResponseBody && (
-                <SchemaComparePanel
-                  responseBody={request.responseBody}
-                  compat={clientCompat}
-                  format={request.format}
-                />
-              )}
-
-              {hasResponseBody && (
-                <div className='space-y-3'>
-                  <ResponseCompatDiff
-                    responseBody={request.responseBody}
-                    compat={clientCompat}
-                  />
-                </div>
-              )}
-
               <Tabs value={responseView} onValueChange={(v: any) => setResponseView(v)} className='w-full'>
                 <div className='flex flex-wrap items-center justify-between gap-4'>
                   <TabsList className='grid w-full grid-cols-2 sm:w-[300px]'>
@@ -973,31 +893,9 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                                   </Button>
                                 </div>
                               </div>
-                              {(() => {
-                                const execReqDiff = previewRequestBodyPatch({
-                                  inboundBody: request?.requestBody,
-                                  outboundBody: execution.requestBody,
-                                  requestHeaders: request?.requestHeaders,
-                                });
-                                if (!execReqDiff.changed) {
-                                  return (
-                                    <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>
-                                      <JsonViewer data={execution.requestBody} rootName='' defaultExpanded={false} hideArrayIndices={true} className='text-xs' />
-                                    </div>
-                                  );
-                                }
-                                return (
-                                  <BodyCompatDiff
-                                    original={execReqDiff.original}
-                                    patched={execReqDiff.patched}
-                                    changed={execReqDiff.changed}
-                                    compat={{ ...clientCompat, applied: true }}
-                                    compact
-                                    sourceLabel={t('requests.client.compat.requestDiffFromExecution')}
-                                    copySuccessLabel={t('requests.client.compat.copyPatchedRequestSuccess')}
-                                  />
-                                );
-                              })()}
+                              <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>
+                                <JsonViewer data={execution.requestBody} rootName='' defaultExpanded={false} hideArrayIndices={true} className='text-xs' />
+                              </div>
                             </div>
                           )}
 
@@ -1023,16 +921,9 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                                   </Button>
                                 </div>
                               </div>
-                              {clientCompat.applied ? (
-                                <ResponseCompatDiff
-                                  responseBody={execution.responseBody}
-                                  compat={clientCompat}
-                                />
-                              ) : (
-                                <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>
-                                  <JsonViewer data={execution.responseBody} rootName='' defaultExpanded={false} hideArrayIndices={true} className='text-xs' />
-                                </div>
-                              )}
+                              <div className='bg-background h-80 w-full overflow-auto rounded-lg border p-3'>
+                                <JsonViewer data={execution.responseBody} rootName='' defaultExpanded={false} hideArrayIndices={true} className='text-xs' />
+                              </div>
                             </div>
                           )}
                         </CardContent>

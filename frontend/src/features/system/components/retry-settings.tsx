@@ -25,7 +25,6 @@ export function RetrySettings() {
     retryDelayMs: 1000,
     streamFirstEventTimeoutSeconds: 0,
     nonStreamResponseTimeoutSeconds: 0,
-    sseKeepAliveIntervalSeconds: 15,
     loadBalancerStrategy: 'adaptive',
     traceStickyMode: 'PREFER_PREVIOUS_CHANNEL',
     emptyResponseDetection: false,
@@ -48,7 +47,6 @@ export function RetrySettings() {
         retryDelayMs: retryPolicy.retryDelayMs,
         streamFirstEventTimeoutSeconds: retryPolicy.streamFirstEventTimeoutSeconds,
         nonStreamResponseTimeoutSeconds: retryPolicy.nonStreamResponseTimeoutSeconds,
-        sseKeepAliveIntervalSeconds: retryPolicy.sseKeepAliveIntervalSeconds ?? 15,
         loadBalancerStrategy: retryPolicy.loadBalancerStrategy,
         traceStickyMode: retryPolicy.traceStickyMode,
         emptyResponseDetection: retryPolicy.emptyResponseDetection,
@@ -189,26 +187,6 @@ export function RetrySettings() {
                 />
               </div>
             )}
-          </div>
-
-          <Separator />
-
-          {/* SSE keepalive is independent of retry enable: keeps proxies from idle-closing slow streams */}
-          <div className='space-y-2'>
-            <Label htmlFor='sse-keepalive-interval'>{t('system.retry.sseKeepAliveIntervalSeconds.label')}</Label>
-            <div className='text-muted-foreground mb-2 text-sm'>{t('system.retry.sseKeepAliveIntervalSeconds.description')}</div>
-            <div className='flex items-center space-x-2'>
-              <Input
-                id='sse-keepalive-interval'
-                type='number'
-                min='0'
-                max='120'
-                value={formData.sseKeepAliveIntervalSeconds ?? 15}
-                onChange={(e) => handleInputChange('sseKeepAliveIntervalSeconds', parseInt(e.target.value) || 0)}
-                className='w-32'
-              />
-              <span className='text-muted-foreground text-sm'>s</span>
-            </div>
           </div>
 
           <Separator />

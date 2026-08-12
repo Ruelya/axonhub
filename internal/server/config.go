@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -24,12 +25,16 @@ func (m *MemorySize) UnmarshalText(text []byte) error {
 
 	// Try plain int64 first (e.g. "536870912")
 	if v, err := strconv.ParseInt(s, 10, 64); err == nil {
+		if v < 0 {
+			return fmt.Errorf("memory size must be non-negative: %q", string(text))
+		}
 		*m = MemorySize(v)
 		return nil
 	}
 
-	// Parse human-readable: "512M", "1.5G", "64K", "512MB"
-	s = strings.ToUpper(strings.TrimSuffix(s, "B"))
+	// Parse human-readable: "512M", "1.5G", "64K", "512MB", "512mb"
+	// Uppercase first so optional trailing "B"/"b" is trimmed correctly.
+	s = strings.TrimSuffix(strings.ToUpper(s), "B")
 	if len(s) < 2 {
 		return fmt.Errorf("invalid memory size: %q", string(text))
 	}
@@ -41,8 +46,14 @@ func (m *MemorySize) UnmarshalText(text []byte) error {
 	if err != nil {
 		return fmt.Errorf("invalid memory size number: %q", string(text))
 	}
+	if math.IsNaN(val) || math.IsInf(val, 0) {
+		return fmt.Errorf("invalid memory size number: %q", string(text))
+	}
+	if val < 0 {
+		return fmt.Errorf("memory size must be non-negative: %q", string(text))
+	}
 
-	var multiplier int64
+	var multiplier float64
 	switch suffix {
 	case 'K':
 		multiplier = 1 << 10
@@ -54,7 +65,14 @@ func (m *MemorySize) UnmarshalText(text []byte) error {
 		return fmt.Errorf("unknown memory size suffix: %q (use K, M, or G)", string(text))
 	}
 
-	*m = MemorySize(int64(val * float64(multiplier)))
+	scaled := val * multiplier
+	// float64(math.MaxInt64) rounds to exactly 2^63, so reject >= to also
+	// catch sizes that scale to 2^63 (the first unrepresentable int64 value).
+	if scaled >= float64(math.MaxInt64) {
+		return fmt.Errorf("memory size overflows int64: %q", string(text))
+	}
+
+	*m = MemorySize(int64(scaled))
 	return nil
 }
 
@@ -73,12 +91,7 @@ type Config struct {
 	// LLMRequestTimeout is the maximum duration for processing a request to LLM.
 	LLMRequestTimeout time.Duration `conf:"llm_request_timeout" yaml:"llm_request_timeout" json:"llm_request_timeout"`
 
-	// SSEKeepAliveInterval is how often AxonHub sends SSE comment keepalives to the
-	// client while waiting for the upstream first event / between stream events.
-	// This prevents intermediate proxies (e.g. Cloudflare ~100s idle) from closing
-	// long-running streaming requests that have not yet produced model tokens.
-	// Set to 0 to disable. Default: 15s.
-	SSEKeepAliveInterval time.Duration `conf:"sse_keepalive_interval" yaml:"sse_keepalive_interval" json:"sse_keepalive_interval"`
+	SSEKeepAlive SSEKeepAlive `conf:"sse_keep_alive" yaml:"sse_keep_alive" json:"sse_keep_alive"`
 
 	Trace     tracing.Config `conf:"trace" yaml:"trace" json:"trace"`
 	Dashboard Dashboard      `conf:"dashboard" yaml:"dashboard" json:"dashboard"`
@@ -93,6 +106,11 @@ type Config struct {
 	// This is important for backup restore which uploads large backup files.
 	// Default: 32 MB. Increase this if you have large backup files.
 	MaxMultipartMemory MemorySize `conf:"max_multipart_memory" yaml:"max_multipart_memory" json:"max_multipart_memory"`
+}
+
+type SSEKeepAlive struct {
+	Enabled  bool          `conf:"enabled" yaml:"enabled" json:"enabled"`
+	Interval time.Duration `conf:"interval" yaml:"interval" json:"interval"`
 }
 
 // Dashboard holds configuration for the dashboard cache settings.

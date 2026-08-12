@@ -114,6 +114,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			channel.FieldSettings:                {Type: field.TypeJSON, Column: channel.FieldSettings},
 			channel.FieldOrderingWeight:          {Type: field.TypeInt, Column: channel.FieldOrderingWeight},
 			channel.FieldErrorMessage:            {Type: field.TypeString, Column: channel.FieldErrorMessage},
+			channel.FieldAutoDisabledAt:          {Type: field.TypeTime, Column: channel.FieldAutoDisabledAt},
 			channel.FieldRemark:                  {Type: field.TypeString, Column: channel.FieldRemark},
 			channel.FieldEndpoints:               {Type: field.TypeJSON, Column: channel.FieldEndpoints},
 		},
@@ -445,6 +446,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			requestexecution.FieldExternalID:                 {Type: field.TypeString, Column: requestexecution.FieldExternalID},
 			requestexecution.FieldModelID:                    {Type: field.TypeString, Column: requestexecution.FieldModelID},
 			requestexecution.FieldFormat:                     {Type: field.TypeString, Column: requestexecution.FieldFormat},
+			requestexecution.FieldReasoningEffort:            {Type: field.TypeString, Column: requestexecution.FieldReasoningEffort},
 			requestexecution.FieldRequestBody:                {Type: field.TypeJSON, Column: requestexecution.FieldRequestBody},
 			requestexecution.FieldResponseBody:               {Type: field.TypeJSON, Column: requestexecution.FieldResponseBody},
 			requestexecution.FieldResponseChunks:             {Type: field.TypeJSON, Column: requestexecution.FieldResponseChunks},
@@ -1774,6 +1776,11 @@ func (f *ChannelFilter) WhereOrderingWeight(p entql.IntP) {
 // WhereErrorMessage applies the entql string predicate on the error_message field.
 func (f *ChannelFilter) WhereErrorMessage(p entql.StringP) {
 	f.Where(p.Field(channel.FieldErrorMessage))
+}
+
+// WhereAutoDisabledAt applies the entql time.Time predicate on the auto_disabled_at field.
+func (f *ChannelFilter) WhereAutoDisabledAt(p entql.TimeP) {
+	f.Where(p.Field(channel.FieldAutoDisabledAt))
 }
 
 // WhereRemark applies the entql string predicate on the remark field.
@@ -3569,6 +3576,11 @@ func (f *RequestExecutionFilter) WhereModelID(p entql.StringP) {
 // WhereFormat applies the entql string predicate on the format field.
 func (f *RequestExecutionFilter) WhereFormat(p entql.StringP) {
 	f.Where(p.Field(requestexecution.FieldFormat))
+}
+
+// WhereReasoningEffort applies the entql string predicate on the reasoning_effort field.
+func (f *RequestExecutionFilter) WhereReasoningEffort(p entql.StringP) {
+	f.Where(p.Field(requestexecution.FieldReasoningEffort))
 }
 
 // WhereRequestBody applies the entql json.RawMessage predicate on the request_body field.

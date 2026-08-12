@@ -118,12 +118,15 @@ var defaultEndpointsForChannelType = map[channel.Type][]objects.ChannelEndpoint{
 	channel.TypeOpenai:          openAIFullDefaultEndpoints,
 	channel.TypeOpenaiResponses: {{APIFormat: llm.APIFormatOpenAIResponse.String()}},
 	channel.TypeAtlascloud:      openAICompatibleDefaultEndpoints,
+	channel.TypeQiniu:           {{APIFormat: llm.APIFormatOpenAIChatCompletion.String()}},
+	channel.TypeQiniuAnthropic:  {{APIFormat: llm.APIFormatAnthropicMessage.String()}},
 	channel.TypeCline:           openAIChatOnlyDefaultEndpoints,
 	channel.TypeCodex: {
 		{APIFormat: llm.APIFormatOpenAIResponse.String()},
 		{APIFormat: llm.APIFormatOpenAIImageGeneration.String()},
 		{APIFormat: llm.APIFormatOpenAIImageEdit.String()},
 	},
+	channel.TypeFenno:        {{APIFormat: llm.APIFormatOpenAIResponse.String()}},
 	channel.TypeVercel:       openAICompatibleDefaultEndpoints,
 	channel.TypeAnthropic:    {{APIFormat: llm.APIFormatAnthropicMessage.String()}},
 	channel.TypeAnthropicAWS: {{APIFormat: llm.APIFormatAnthropicMessage.String()}},
@@ -140,7 +143,6 @@ var defaultEndpointsForChannelType = map[channel.Type][]objects.ChannelEndpoint{
 	channel.TypeDeepseek:          {{APIFormat: llm.APIFormatOpenAIChatCompletion.String()}, {APIFormat: llm.APIFormatOpenAICompletion.String()}},
 	channel.TypeDeepseekAnthropic: {{APIFormat: llm.APIFormatAnthropicMessage.String()}},
 	channel.TypeDeepinfra:         openAICompatibleDefaultEndpoints,
-	channel.TypeQiniu:             {{APIFormat: llm.APIFormatOpenAIChatCompletion.String()}},
 	channel.TypeFireworks:         {{APIFormat: llm.APIFormatOpenAIChatCompletion.String()}},
 	channel.TypeDoubao: {
 		{APIFormat: llm.APIFormatOpenAIChatCompletion.String()},
@@ -196,6 +198,12 @@ var defaultEndpointsForChannelType = map[channel.Type][]objects.ChannelEndpoint{
 	channel.TypeOllamaAnthropic:  {{APIFormat: llm.APIFormatAnthropicMessage.String()}},
 	channel.TypeEvolink:          openAICompatibleDefaultEndpoints,
 	channel.TypeEvolinkAnthropic: {{APIFormat: llm.APIFormatAnthropicMessage.String()}},
+	channel.TypeGroq: {
+		{APIFormat: llm.APIFormatOpenAIChatCompletion.String()},
+		{APIFormat: llm.APIFormatOpenAISpeech.String()},
+		{APIFormat: llm.APIFormatOpenAITranscription.String()},
+		{APIFormat: llm.APIFormatOpenAITranslation.String()},
+	},
 }
 
 func DefaultEndpointsForChannelType(t channel.Type) []objects.ChannelEndpoint {

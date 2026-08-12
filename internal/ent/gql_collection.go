@@ -828,6 +828,11 @@ func (_q *ChannelQuery) collectField(ctx context.Context, oneNode bool, opCtx *g
 				selectedFields = append(selectedFields, channel.FieldErrorMessage)
 				fieldSeen[channel.FieldErrorMessage] = struct{}{}
 			}
+		case "autoDisabledAt":
+			if _, ok := fieldSeen[channel.FieldAutoDisabledAt]; !ok {
+				selectedFields = append(selectedFields, channel.FieldAutoDisabledAt)
+				fieldSeen[channel.FieldAutoDisabledAt] = struct{}{}
+			}
 		case "remark":
 			if _, ok := fieldSeen[channel.FieldRemark]; !ok {
 				selectedFields = append(selectedFields, channel.FieldRemark)
@@ -4040,6 +4045,11 @@ func (_q *RequestExecutionQuery) collectField(ctx context.Context, oneNode bool,
 			if _, ok := fieldSeen[requestexecution.FieldFormat]; !ok {
 				selectedFields = append(selectedFields, requestexecution.FieldFormat)
 				fieldSeen[requestexecution.FieldFormat] = struct{}{}
+			}
+		case "reasoningEffort":
+			if _, ok := fieldSeen[requestexecution.FieldReasoningEffort]; !ok {
+				selectedFields = append(selectedFields, requestexecution.FieldReasoningEffort)
+				fieldSeen[requestexecution.FieldReasoningEffort] = struct{}{}
 			}
 		case "requestBody":
 			if _, ok := fieldSeen[requestexecution.FieldRequestBody]; !ok {

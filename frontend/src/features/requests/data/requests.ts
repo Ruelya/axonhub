@@ -70,8 +70,11 @@ function buildRequestsQuery(permissions: { canViewApiKeys: boolean; canViewChann
             executions(first: 10, orderBy: { field: CREATED_AT, direction: DESC }) {
               edges {
                 node {
+                  id
+                  createdAt
                   modelID
                   status
+                  reasoningEffort
                   passThroughApplied${executionChannelFields}
                 }
                 cursor
@@ -258,6 +261,7 @@ function buildRequestExecutionsQuery(permissions: { canViewChannels: boolean }) 
                 responseStatusCode
                 status
                 format
+                reasoningEffort
                 stream
                 requestURL
                 passThroughApplied

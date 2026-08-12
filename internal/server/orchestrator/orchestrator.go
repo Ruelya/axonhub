@@ -83,6 +83,7 @@ func NewChatCompletionOrchestrator(
 		PromptProtecter:    promptProtectionRuleService,
 		Middlewares: []pipeline.Middleware{
 			cc.StripBillingHeaderCCH(),
+			cc.SystemCacheCompatibility(),
 			stream.EnsureUsage(),
 		},
 		PipelineFactory:            pipeline.NewFactory(httpClient),
@@ -251,7 +252,7 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 	// Add global middlewares
 	middlewares = append(middlewares, processor.Middlewares...)
 
-	inbound, outbound := NewPersistentTransformers(state, processor.Inbound)
+	inbound, outbound := NewPersistentTransformers(state, processor.Inbound, processor.Middlewares...)
 
 	// Add inbound middlewares (executed after inbound.TransformRequest)
 	middlewares = append(middlewares,
@@ -274,6 +275,9 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 	middlewares = append(middlewares,
 		// applyPassThroughBody runs first so that override operations can still modify the pass-through body.
 		applyPassThroughRequestBody(outbound, processor.SystemService),
+		// Codex Responses metadata must travel with a pass-through body so compatible
+		// upstreams preserve the client's protocol behavior.
+		applyPassThroughRequestHeaders(outbound),
 		applyOverrideRequestBody(outbound),
 		// Grok Build → non-xAI Responses: inject prompt_cache_key on the final outbound body.
 		applyGrokClientRequestCompat(outbound, processor.SystemService),

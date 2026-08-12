@@ -964,6 +964,18 @@ type ChannelWhereInput struct {
 	ErrorMessageEqualFold    *string  `json:"errorMessageEqualFold,omitempty"`
 	ErrorMessageContainsFold *string  `json:"errorMessageContainsFold,omitempty"`
 
+	// "auto_disabled_at" field predicates.
+	AutoDisabledAt       *time.Time  `json:"autoDisabledAt,omitempty"`
+	AutoDisabledAtNEQ    *time.Time  `json:"autoDisabledAtNEQ,omitempty"`
+	AutoDisabledAtIn     []time.Time `json:"autoDisabledAtIn,omitempty"`
+	AutoDisabledAtNotIn  []time.Time `json:"autoDisabledAtNotIn,omitempty"`
+	AutoDisabledAtGT     *time.Time  `json:"autoDisabledAtGT,omitempty"`
+	AutoDisabledAtGTE    *time.Time  `json:"autoDisabledAtGTE,omitempty"`
+	AutoDisabledAtLT     *time.Time  `json:"autoDisabledAtLT,omitempty"`
+	AutoDisabledAtLTE    *time.Time  `json:"autoDisabledAtLTE,omitempty"`
+	AutoDisabledAtIsNil  bool        `json:"autoDisabledAtIsNil,omitempty"`
+	AutoDisabledAtNotNil bool        `json:"autoDisabledAtNotNil,omitempty"`
+
 	// "remark" field predicates.
 	Remark             *string  `json:"remark,omitempty"`
 	RemarkNEQ          *string  `json:"remarkNEQ,omitempty"`
@@ -1415,6 +1427,36 @@ func (i *ChannelWhereInput) P() (predicate.Channel, error) {
 	}
 	if i.ErrorMessageContainsFold != nil {
 		predicates = append(predicates, channel.ErrorMessageContainsFold(*i.ErrorMessageContainsFold))
+	}
+	if i.AutoDisabledAt != nil {
+		predicates = append(predicates, channel.AutoDisabledAtEQ(*i.AutoDisabledAt))
+	}
+	if i.AutoDisabledAtNEQ != nil {
+		predicates = append(predicates, channel.AutoDisabledAtNEQ(*i.AutoDisabledAtNEQ))
+	}
+	if len(i.AutoDisabledAtIn) > 0 {
+		predicates = append(predicates, channel.AutoDisabledAtIn(i.AutoDisabledAtIn...))
+	}
+	if len(i.AutoDisabledAtNotIn) > 0 {
+		predicates = append(predicates, channel.AutoDisabledAtNotIn(i.AutoDisabledAtNotIn...))
+	}
+	if i.AutoDisabledAtGT != nil {
+		predicates = append(predicates, channel.AutoDisabledAtGT(*i.AutoDisabledAtGT))
+	}
+	if i.AutoDisabledAtGTE != nil {
+		predicates = append(predicates, channel.AutoDisabledAtGTE(*i.AutoDisabledAtGTE))
+	}
+	if i.AutoDisabledAtLT != nil {
+		predicates = append(predicates, channel.AutoDisabledAtLT(*i.AutoDisabledAtLT))
+	}
+	if i.AutoDisabledAtLTE != nil {
+		predicates = append(predicates, channel.AutoDisabledAtLTE(*i.AutoDisabledAtLTE))
+	}
+	if i.AutoDisabledAtIsNil {
+		predicates = append(predicates, channel.AutoDisabledAtIsNil())
+	}
+	if i.AutoDisabledAtNotNil {
+		predicates = append(predicates, channel.AutoDisabledAtNotNil())
 	}
 	if i.Remark != nil {
 		predicates = append(predicates, channel.RemarkEQ(*i.Remark))
@@ -7722,6 +7764,23 @@ type RequestExecutionWhereInput struct {
 	FormatEqualFold    *string  `json:"formatEqualFold,omitempty"`
 	FormatContainsFold *string  `json:"formatContainsFold,omitempty"`
 
+	// "reasoning_effort" field predicates.
+	ReasoningEffort             *string  `json:"reasoningEffort,omitempty"`
+	ReasoningEffortNEQ          *string  `json:"reasoningEffortNEQ,omitempty"`
+	ReasoningEffortIn           []string `json:"reasoningEffortIn,omitempty"`
+	ReasoningEffortNotIn        []string `json:"reasoningEffortNotIn,omitempty"`
+	ReasoningEffortGT           *string  `json:"reasoningEffortGT,omitempty"`
+	ReasoningEffortGTE          *string  `json:"reasoningEffortGTE,omitempty"`
+	ReasoningEffortLT           *string  `json:"reasoningEffortLT,omitempty"`
+	ReasoningEffortLTE          *string  `json:"reasoningEffortLTE,omitempty"`
+	ReasoningEffortContains     *string  `json:"reasoningEffortContains,omitempty"`
+	ReasoningEffortHasPrefix    *string  `json:"reasoningEffortHasPrefix,omitempty"`
+	ReasoningEffortHasSuffix    *string  `json:"reasoningEffortHasSuffix,omitempty"`
+	ReasoningEffortIsNil        bool     `json:"reasoningEffortIsNil,omitempty"`
+	ReasoningEffortNotNil       bool     `json:"reasoningEffortNotNil,omitempty"`
+	ReasoningEffortEqualFold    *string  `json:"reasoningEffortEqualFold,omitempty"`
+	ReasoningEffortContainsFold *string  `json:"reasoningEffortContainsFold,omitempty"`
+
 	// "error_message" field predicates.
 	ErrorMessage             *string  `json:"errorMessage,omitempty"`
 	ErrorMessageNEQ          *string  `json:"errorMessageNEQ,omitempty"`
@@ -8168,6 +8227,51 @@ func (i *RequestExecutionWhereInput) P() (predicate.RequestExecution, error) {
 	}
 	if i.FormatContainsFold != nil {
 		predicates = append(predicates, requestexecution.FormatContainsFold(*i.FormatContainsFold))
+	}
+	if i.ReasoningEffort != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortEQ(*i.ReasoningEffort))
+	}
+	if i.ReasoningEffortNEQ != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortNEQ(*i.ReasoningEffortNEQ))
+	}
+	if len(i.ReasoningEffortIn) > 0 {
+		predicates = append(predicates, requestexecution.ReasoningEffortIn(i.ReasoningEffortIn...))
+	}
+	if len(i.ReasoningEffortNotIn) > 0 {
+		predicates = append(predicates, requestexecution.ReasoningEffortNotIn(i.ReasoningEffortNotIn...))
+	}
+	if i.ReasoningEffortGT != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortGT(*i.ReasoningEffortGT))
+	}
+	if i.ReasoningEffortGTE != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortGTE(*i.ReasoningEffortGTE))
+	}
+	if i.ReasoningEffortLT != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortLT(*i.ReasoningEffortLT))
+	}
+	if i.ReasoningEffortLTE != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortLTE(*i.ReasoningEffortLTE))
+	}
+	if i.ReasoningEffortContains != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortContains(*i.ReasoningEffortContains))
+	}
+	if i.ReasoningEffortHasPrefix != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortHasPrefix(*i.ReasoningEffortHasPrefix))
+	}
+	if i.ReasoningEffortHasSuffix != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortHasSuffix(*i.ReasoningEffortHasSuffix))
+	}
+	if i.ReasoningEffortIsNil {
+		predicates = append(predicates, requestexecution.ReasoningEffortIsNil())
+	}
+	if i.ReasoningEffortNotNil {
+		predicates = append(predicates, requestexecution.ReasoningEffortNotNil())
+	}
+	if i.ReasoningEffortEqualFold != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortEqualFold(*i.ReasoningEffortEqualFold))
+	}
+	if i.ReasoningEffortContainsFold != nil {
+		predicates = append(predicates, requestexecution.ReasoningEffortContainsFold(*i.ReasoningEffortContainsFold))
 	}
 	if i.ErrorMessage != nil {
 		predicates = append(predicates, requestexecution.ErrorMessageEQ(*i.ErrorMessage))

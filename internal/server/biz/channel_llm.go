@@ -384,7 +384,7 @@ func (svc *ChannelService) buildNonDefaultEndpointOutbound(
 	case llm.APIFormatOpenAIResponse.String(),
 		llm.APIFormatOpenAIResponseCompact.String():
 		transport := endpointTransport(ep)
-		if c.Type == channel.TypeCodex && ep.APIFormat == llm.APIFormatOpenAIResponse.String() {
+		if (c.Type == channel.TypeCodex || c.Type == channel.TypeFenno) && ep.APIFormat == llm.APIFormatOpenAIResponse.String() {
 			return svc.buildCodexOutbound(c, ch, baseURL, transport, ch.HTTPClient)
 		}
 
@@ -403,7 +403,7 @@ func (svc *ChannelService) buildNonDefaultEndpointOutbound(
 		llm.APIFormatOpenAISpeech.String(),
 		llm.APIFormatOpenAITranscription.String(),
 		llm.APIFormatOpenAITranslation.String():
-		if c.Type == channel.TypeCodex &&
+		if (c.Type == channel.TypeCodex || c.Type == channel.TypeFenno) &&
 			(ep.APIFormat == llm.APIFormatOpenAIImageGeneration.String() ||
 				ep.APIFormat == llm.APIFormatOpenAIImageEdit.String()) {
 			transport := endpointTransport(ep)
@@ -666,7 +666,7 @@ func (svc *ChannelService) buildChannelWithTransformer(c *ent.Channel, apiKeyOve
 		ch.Outbound = transformer
 
 		return ch, nil
-	case channel.TypeAnthropic, channel.TypeMinimaxAnthropic, channel.TypeVolcengineAnthropic, channel.TypeAihubmixAnthropic, channel.TypeXiaomiAnthropic, channel.TypeEvolinkAnthropic:
+	case channel.TypeAnthropic, channel.TypeQiniuAnthropic, channel.TypeMinimaxAnthropic, channel.TypeVolcengineAnthropic, channel.TypeAihubmixAnthropic, channel.TypeXiaomiAnthropic, channel.TypeEvolinkAnthropic:
 		transformer, err := anthropic.NewOutboundTransformerWithConfig(&anthropic.Config{
 			Type:           anthropic.PlatformDirect,
 			BaseURL:        c.BaseURL,
@@ -925,7 +925,7 @@ func (svc *ChannelService) buildChannelWithTransformer(c *ent.Channel, apiKeyOve
 		ch.Outbound = transformer
 
 		return ch, nil
-	case channel.TypeCodex:
+	case channel.TypeCodex, channel.TypeFenno:
 		transport := primaryEndpointTransport(c, llm.APIFormatOpenAIResponse.String())
 		transformer, err := svc.buildCodexOutbound(c, ch, c.BaseURL, transport, httpClient)
 		if err != nil {
@@ -997,7 +997,7 @@ func (svc *ChannelService) buildChannelWithTransformer(c *ent.Channel, apiKeyOve
 	case channel.TypeOpenai, channel.TypeAtlascloud, channel.TypeDeepinfra, channel.TypeQiniu, channel.TypeMinimax,
 		channel.TypePpio, channel.TypeSiliconflow,
 		channel.TypeVercel, channel.TypeAihubmix, channel.TypeBurncloud, channel.TypeGithub,
-		channel.TypeOpencodeGo, channel.TypeEvolink:
+		channel.TypeOpencodeGo, channel.TypeEvolink, channel.TypeGroq:
 		var reasoningEffortMapping []llm.ReasoningEffortMapping
 		if c.Settings != nil {
 			reasoningEffortMapping = c.Settings.TransformOptions.ReasoningEffortMapping
